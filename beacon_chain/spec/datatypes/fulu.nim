@@ -5,7 +5,11 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
+<<<<<<< HEAD
 {.push raises: [].}
+=======
+{.push raises: [], gcsafe.}
+>>>>>>> origin/unstable
 
 # Types specific to Fulu (i.e. known to have changed across hard forks) - see
 # `base` for types and guidelines common across forks
@@ -16,8 +20,13 @@
 {.experimental: "notnil".}
 
 import
+<<<<<<< HEAD
   std/[sequtils, typetraits],
   "."/[phase0, base, electra],
+=======
+  std/typetraits,
+  "."/[phase0, base, bellatrix, electra],
+>>>>>>> origin/unstable
   chronicles,
   json_serialization,
   ssz_serialization/[merkleization, proofs],
@@ -25,17 +34,30 @@ import
   ../digest,
   kzg4844/[kzg, kzg_abi]
 
+<<<<<<< HEAD
 from std/strutils import join
 from stew/bitops2 import log2trunc
+=======
+from std/sequtils import mapIt
+from std/strutils import join
+>>>>>>> origin/unstable
 from stew/byteutils import to0xHex
 from ./altair import
   EpochParticipationFlags, InactivityScores, SyncAggregate, SyncCommittee,
   TrustedSyncAggregate, SyncnetBits, num_active_participants
+<<<<<<< HEAD
 from ./bellatrix import BloomLogs, ExecutionAddress, Transaction
 from ./capella import
   ExecutionBranch, HistoricalSummary, SignedBLSToExecutionChange,
   SignedBLSToExecutionChangeList, Withdrawal, EXECUTION_PAYLOAD_GINDEX
 from ./deneb import Blobs, BlobsBundle, KzgCommitments, KzgProofs
+=======
+from ./capella import
+  ExecutionBranch, HistoricalSummary, SignedBLSToExecutionChange,
+  SignedBLSToExecutionChangeList, Withdrawal, EXECUTION_PAYLOAD_GINDEX
+from ./deneb import
+  Blobs, ExecutionPayload, ExecutionPayloadHeader, KzgCommitments, KzgProofs
+>>>>>>> origin/unstable
 
 export json_serialization, base
 
@@ -49,13 +71,18 @@ const
   CELLS_PER_EXT_BLOB* = FIELD_ELEMENTS_PER_EXT_BLOB div FIELD_ELEMENTS_PER_CELL
   # The number of cells in an extended blob |
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/p2p-interface.md#preset
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/p2p-interface.md#preset
+>>>>>>> origin/unstable
   KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH* = 4
   KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH_GINDEX* = 27
 
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#data-size
   NUMBER_OF_COLUMNS* = 128
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/p2p-interface.md#configuration
   DATA_COLUMN_SIDECAR_SUBNET_COUNT* = 128
 
@@ -63,6 +90,13 @@ const
   SAMPLES_PER_SLOT* = 8
   CUSTODY_REQUIREMENT* = 4
   NUMBER_OF_CUSTODY_GROUPS* = 128
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/p2p-interface.md#configuration
+  DATA_COLUMN_SIDECAR_SUBNET_COUNT* = 128
+
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/das-core.md#custody-setting
+  CUSTODY_REQUIREMENT* = 4
+>>>>>>> origin/unstable
 
   # Minimum number of custody groups an honest node with
   # validators attached custodies and serves samples from
@@ -72,11 +106,16 @@ const
   # 2**5 * 10**9 (= 32,000,000,000) Gwei
   BALANCE_PER_ADDITIONAL_CUSTODY_GROUP*: uint64 = 32000000000'u64
 
+<<<<<<< HEAD
   # Number of columns in the network per custody group
   COLUMNS_PER_GROUP* = NUMBER_OF_COLUMNS div NUMBER_OF_CUSTODY_GROUPS
 
 type
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.0/specs/fulu/polynomial-commitments-sampling.md#custom-types
+=======
+type
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/polynomial-commitments-sampling.md#custom-types
+>>>>>>> origin/unstable
   BLSFieldElement* = KzgBytes32
   G2Point* = array[96, byte]
   PolynomialCoeff* = List[BLSFieldElement, FIELD_ELEMENTS_PER_EXT_BLOB]
@@ -92,45 +131,92 @@ type
   CellIndex* = uint64
   CustodyIndex* = uint64
 
+<<<<<<< HEAD
 type
   DataColumn* = List[KzgCell, Limit(MAX_BLOB_COMMITMENTS_PER_BLOCK)]
 
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.3/specs/fulu/das-core.md#datacolumnsidecar
+=======
+  DataColumn* = List[KzgCell, Limit(MAX_BLOB_COMMITMENTS_PER_BLOCK)]
+  DataColumnIndices* = List[ColumnIndex, Limit(NUMBER_OF_COLUMNS)]
+
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.5/specs/fulu/das-core.md#datacolumnsidecar
+>>>>>>> origin/unstable
   DataColumnSidecar* = object
     index*: ColumnIndex # Index of column in extended matrix
     column*: DataColumn
     kzg_commitments*: KzgCommitments
+<<<<<<< HEAD
     kzg_proofs*: KzgProofs
+=======
+    kzg_proofs*: deneb.KzgProofs
+>>>>>>> origin/unstable
     signed_block_header*: SignedBeaconBlockHeader
     kzg_commitments_inclusion_proof*:
       array[KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH, Eth2Digest]
 
   DataColumnSidecars* = seq[ref DataColumnSidecar]
 
+<<<<<<< HEAD
+=======
+  DataColumnSidecarInfoObject* = object
+    block_root*: Eth2Digest
+    index*: ColumnIndex
+    slot*: Slot
+    kzg_commitments*: KzgCommitments
+
+>>>>>>> origin/unstable
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/p2p-interface.md#datacolumnidentifier
   DataColumnIdentifier* = object
     block_root*: Eth2Digest
     index*: ColumnIndex
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#matrixentry
+=======
+  # https://github.com/ethereum/consensus-specs/blob/b8b5fbb8d16f52d42a716fa93289062fe2124c7c/specs/fulu/p2p-interface.md#datacolumnsbyrootidentifier
+  DataColumnsByRootIdentifier* = object
+    block_root*: Eth2Digest
+    indices*: DataColumnIndices
+
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/das-core.md#matrixentry
+>>>>>>> origin/unstable
   MatrixEntry* = object
     cell*: Cell
     kzg_proof*: KzgProof
     column_index*: ColumnIndex
     row_index*: RowIndex
 
+<<<<<<< HEAD
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.5/specs/fulu/validator.md#blobsbundle
+  KzgProofs* = List[KzgProof,
+    Limit FIELD_ELEMENTS_PER_EXT_BLOB * MAX_BLOB_COMMITMENTS_PER_BLOCK]
+
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.5/specs/fulu/validator.md#blobsbundle
+  BlobsBundle* = object
+    commitments*: KzgCommitments
+    proofs*: fulu.KzgProofs
+    blobs*: Blobs
+
+>>>>>>> origin/unstable
   # Not in spec, defined in order to compute custody subnets
   CgcBits* = BitArray[DATA_COLUMN_SIDECAR_SUBNET_COUNT]
 
   CgcCount* = uint8
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/p2p-interface.md#metadata
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.2/specs/fulu/p2p-interface.md#enr-structure
+>>>>>>> origin/unstable
   MetaData* = object
     seq_number*: uint64
     attnets*: AttnetBits
     syncnets*: SyncnetBits
     custody_group_count*: uint64
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/deneb/beacon-chain.md#executionpayload
   ExecutionPayload* = object
     # Execution block header fields
@@ -199,12 +285,24 @@ type
   NextSyncCommitteeBranch* =
     array[log2trunc(NEXT_SYNC_COMMITTEE_GINDEX_ELECTRA), Eth2Digest]
 
+=======
+  ExecutionPayloadForSigning* = object
+    executionPayload*: deneb.ExecutionPayload
+    blockValue*: Wei
+    blobsBundle*: fulu.BlobsBundle # [New in Fulu]
+    executionRequests*: seq[seq[byte]]
+
+>>>>>>> origin/unstable
   # https://github.com/ethereum/consensus-specs/blob/v1.4.0-beta.5/specs/capella/light-client/sync-protocol.md#modified-lightclientheader
   LightClientHeader* = object
     beacon*: BeaconBlockHeader
       ## Beacon block header
 
+<<<<<<< HEAD
     execution*: ExecutionPayloadHeader
+=======
+    execution*: deneb.ExecutionPayloadHeader
+>>>>>>> origin/unstable
       ## Execution payload header corresponding to `beacon.body_root` (from Capella onward)
     execution_branch*: capella.ExecutionBranch
 
@@ -215,7 +313,11 @@ type
 
     current_sync_committee*: SyncCommittee
       ## Current sync committee corresponding to `header.beacon.state_root`
+<<<<<<< HEAD
     current_sync_committee_branch*: CurrentSyncCommitteeBranch
+=======
+    current_sync_committee_branch*: electra.CurrentSyncCommitteeBranch
+>>>>>>> origin/unstable
 
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.5/specs/altair/light-client/sync-protocol.md#lightclientupdate
   LightClientUpdate* = object
@@ -225,25 +327,41 @@ type
     next_sync_committee*: SyncCommittee
       ## Next sync committee corresponding to
       ## `attested_header.beacon.state_root`
+<<<<<<< HEAD
     next_sync_committee_branch*: NextSyncCommitteeBranch
 
     # Finalized header corresponding to `attested_header.beacon.state_root`
     finalized_header*: LightClientHeader
     finality_branch*: FinalityBranch
+=======
+    next_sync_committee_branch*: electra.NextSyncCommitteeBranch
+
+    # Finalized header corresponding to `attested_header.beacon.state_root`
+    finalized_header*: LightClientHeader
+    finality_branch*: electra.FinalityBranch
+>>>>>>> origin/unstable
 
     sync_aggregate*: SyncAggregate
       ## Sync committee aggregate signature
     signature_slot*: Slot
       ## Slot at which the aggregate signature was created (untrusted)
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.5/specs/altair/light-client/sync-protocol.md#lightclientfinalityupdate
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/altair/light-client/sync-protocol.md#lightclientfinalityupdate
+>>>>>>> origin/unstable
   LightClientFinalityUpdate* = object
     # Header attested to by the sync committee
     attested_header*: LightClientHeader
 
     # Finalized header corresponding to `attested_header.beacon.state_root`
     finalized_header*: LightClientHeader
+<<<<<<< HEAD
     finality_branch*: FinalityBranch
+=======
+    finality_branch*: electra.FinalityBranch
+>>>>>>> origin/unstable
 
     # Sync committee aggregate signature
     sync_aggregate*: SyncAggregate
@@ -353,8 +471,12 @@ type
     next_sync_committee*: SyncCommittee
 
     # Execution
+<<<<<<< HEAD
     latest_execution_payload_header*: ExecutionPayloadHeader
       ## [Modified in Electra:EIP6110:EIP7002]
+=======
+    latest_execution_payload_header*: deneb.ExecutionPayloadHeader
+>>>>>>> origin/unstable
 
     # Withdrawals
     next_withdrawal_index*: WithdrawalIndex
@@ -378,6 +500,14 @@ type
       HashList[PendingPartialWithdrawal, Limit PENDING_PARTIAL_WITHDRAWALS_LIMIT]
     pending_consolidations*:
       HashList[PendingConsolidation, Limit PENDING_CONSOLIDATIONS_LIMIT]
+<<<<<<< HEAD
+=======
+
+    # [New in Fulu:EIP7917]
+    proposer_lookahead*:
+        HashArray[Limit ((MIN_SEED_LOOKAHEAD + 1) * SLOTS_PER_EPOCH), uint64]
+
+>>>>>>> origin/unstable
       ## [New in Electra:EIP7251]
 
   # TODO Careful, not nil analysis is broken / incomplete and the semantics will
@@ -470,7 +600,11 @@ type
     sync_aggregate*: SyncAggregate
 
     # Execution
+<<<<<<< HEAD
     execution_payload*: fulu.ExecutionPayload   # [Modified in Electra:EIP6110:EIP7002]
+=======
+    execution_payload*: deneb.ExecutionPayload
+>>>>>>> origin/unstable
     bls_to_execution_changes*: SignedBLSToExecutionChangeList
     blob_kzg_commitments*: KzgCommitments
     execution_requests*: ExecutionRequests  # [New in Electra]
@@ -510,7 +644,11 @@ type
     sync_aggregate*: TrustedSyncAggregate
 
     # Execution
+<<<<<<< HEAD
     execution_payload*: ExecutionPayload   # [Modified in Electra:EIP6110:EIP7002]
+=======
+    execution_payload*: deneb.ExecutionPayload
+>>>>>>> origin/unstable
     bls_to_execution_changes*: SignedBLSToExecutionChangeList
     blob_kzg_commitments*: KzgCommitments
     execution_requests*: ExecutionRequests  # [New in Electra]
@@ -538,7 +676,11 @@ type
     sync_aggregate*: TrustedSyncAggregate
 
     # Execution
+<<<<<<< HEAD
     execution_payload*: ExecutionPayload   # [Modified in Electra:EIP6110:EIP7002]
+=======
+    execution_payload*: deneb.ExecutionPayload
+>>>>>>> origin/unstable
     bls_to_execution_changes*: SignedBLSToExecutionChangeList
     blob_kzg_commitments*: KzgCommitments
     execution_requests*: ExecutionRequests  # [New in Electra]
@@ -569,12 +711,15 @@ type
 
     root* {.dontSerialize.}: Eth2Digest # cached root of signed beacon block
 
+<<<<<<< HEAD
   MsgTrustedSignedBeaconBlock* = object
     message*: TrustedBeaconBlock
     signature*: ValidatorSig
 
     root* {.dontSerialize.}: Eth2Digest # cached root of signed beacon block
 
+=======
+>>>>>>> origin/unstable
   TrustedSignedBeaconBlock* = object
     message*: TrustedBeaconBlock
     signature*: TrustedSig
@@ -584,7 +729,10 @@ type
   SomeSignedBeaconBlock* =
     SignedBeaconBlock |
     SigVerifiedSignedBeaconBlock |
+<<<<<<< HEAD
     MsgTrustedSignedBeaconBlock |
+=======
+>>>>>>> origin/unstable
     TrustedSignedBeaconBlock
   SomeBeaconBlock* =
     BeaconBlock |
@@ -597,7 +745,11 @@ type
 
   BlockContents* = object
     `block`*: BeaconBlock
+<<<<<<< HEAD
     kzg_proofs*: KzgProofs
+=======
+    kzg_proofs*: fulu.KzgProofs
+>>>>>>> origin/unstable
     blobs*: Blobs
 
 func shortLog*(v: DataColumnSidecar): auto =
@@ -614,6 +766,18 @@ func shortLog*(v: seq[DataColumnSidecar]): auto =
 func shortLog*(x: seq[DataColumnIdentifier]): string =
   "[" & x.mapIt(shortLog(it.block_root) & "/" & $it.index).join(", ") & "]"
 
+<<<<<<< HEAD
+=======
+func shortLog*(xs: seq[DataColumnsByRootIdentifier]): string =
+  ## Formats like:  [abcd…/0,2,4,  ef09…/1,3]
+  "[" &
+    xs.mapIt(
+      shortLog(it.block_root) & "/" &
+      it.indices.mapIt($it).join(",")
+    ).join(", ") &
+  "]"
+
+>>>>>>> origin/unstable
 func shortLog*(x: seq[ColumnIndex]): string =
   "<" & x.mapIt($it).join(", ") & ">"
 
@@ -650,6 +814,7 @@ func shortLog*(v: SomeSignedBeaconBlock): auto =
     signature: shortLog(v.signature)
   )
 
+<<<<<<< HEAD
 func shortLog*(v: ExecutionPayload): auto =
   (
     parent_hash: shortLog(v.parent_hash),
@@ -673,12 +838,19 @@ func shortLog*(v: ExecutionPayload): auto =
 template asSigned*(
     x: SigVerifiedSignedBeaconBlock |
        MsgTrustedSignedBeaconBlock |
+=======
+template asSigned*(
+    x: SigVerifiedSignedBeaconBlock |
+>>>>>>> origin/unstable
        TrustedSignedBeaconBlock): SignedBeaconBlock =
   isomorphicCast[SignedBeaconBlock](x)
 
 template asSigVerified*(
     x: SignedBeaconBlock |
+<<<<<<< HEAD
        MsgTrustedSignedBeaconBlock |
+=======
+>>>>>>> origin/unstable
        TrustedSignedBeaconBlock): SigVerifiedSignedBeaconBlock =
   isomorphicCast[SigVerifiedSignedBeaconBlock](x)
 
@@ -686,6 +858,7 @@ template asSigVerified*(
     x: BeaconBlock | TrustedBeaconBlock): SigVerifiedBeaconBlock =
   isomorphicCast[SigVerifiedBeaconBlock](x)
 
+<<<<<<< HEAD
 template asMsgTrusted*(
     x: SignedBeaconBlock |
        SigVerifiedSignedBeaconBlock |
@@ -697,3 +870,9 @@ template asTrusted*(
        SigVerifiedSignedBeaconBlock |
        MsgTrustedSignedBeaconBlock): TrustedSignedBeaconBlock =
   isomorphicCast[TrustedSignedBeaconBlock](x)
+=======
+template asTrusted*(
+    x: SignedBeaconBlock |
+       SigVerifiedSignedBeaconBlock): TrustedSignedBeaconBlock =
+  isomorphicCast[TrustedSignedBeaconBlock](x)
+>>>>>>> origin/unstable

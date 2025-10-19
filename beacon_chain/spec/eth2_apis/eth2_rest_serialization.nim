@@ -5,21 +5,17 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
-{.push raises: [].}
+{.push raises: [], gcsafe.}
 
-import std/[typetraits, strutils]
-import results, stew/[assign2, base10, byteutils, endians2], presto/common,
-       libp2p/peerid, serialization, json_serialization,
-       json_serialization/std/[net, sets],
-       json_serialization/stew/results as jsonSerializationResults,
-       stint, chronicles
-import ".."/[eth2_ssz_serialization, forks, keystore],
-       ".."/../consensus_object_pools/block_pools_types,
-       ".."/mev/[bellatrix_mev, capella_mev],
-       ".."/../validators/slashing_protection_common,
-       "."/[rest_types, rest_keymanager_types]
-import nimcrypto/utils as ncrutils
+import
+  std/[json, strutils],
+  stew/[base10, byteutils],
+  libp2p/peerid,
+  presto/common as presto_common,
+  ../eth2_ssz_serialization,
+  ./eth2_rest_json_serialization
 
+<<<<<<< HEAD
 export
   eth2_ssz_serialization, results, peerid, common, serialization, chronicles,
   json_serialization, net, sets, rest_types, slashing_protection_common,
@@ -28,6 +24,9 @@ export
 from web3/primitives import Hash32, Quantity
 from json import getStr, newJString
 export primitives.Hash32, primitives.Quantity
+=======
+export peerid, presto_common, eth2_ssz_serialization, eth2_rest_json_serialization
+>>>>>>> origin/unstable
 
 func decodeMediaType*(
     contentType: Opt[ContentTypeData]): Result[MediaType, string] =
@@ -35,6 +34,7 @@ func decodeMediaType*(
     return err("Missing or incorrect Content-Type")
   ok contentType.get.mediaType
 
+<<<<<<< HEAD
 type
   EmptyBody* = object
 
@@ -322,6 +322,8 @@ template writeValue*(w: JsonWriter[RestJson], value: tuple) =
 ## This also means that when new fields are introduced to the object definitions
 ## below, one must use the `Opt[T]` type.
 
+=======
+>>>>>>> origin/unstable
 const
   DecimalSet = {'0' .. '9'}
     # Base10 (decimal) set of chars
@@ -338,13 +340,17 @@ const
   UrlEncodedMediaType* = MediaType.init("application/x-www-form-urlencoded")
   UnableDecodeVersionError = "Unable to decode version"
   UnableDecodeError = "Unable to decode data"
+<<<<<<< HEAD
   UnexpectedDecodeError = "Unexpected decoding error"
+=======
+>>>>>>> origin/unstable
   InvalidContentTypeError* = "Invalid content type"
   UnexpectedForkVersionError* = "Unexpected fork version received"
 
 type
   EncodeTypes* =
     BlobSidecarInfoObject |
+    DataColumnSidecarInfoObject |
     DeleteKeystoresBody |
     EmptyBody |
     ImportDistributedKeystoresBody |
@@ -371,6 +377,10 @@ type
     DenebSignedBlockContents |
     ElectraSignedBlockContents |
     FuluSignedBlockContents |
+<<<<<<< HEAD
+=======
+    GloasSignedBlockContents |
+>>>>>>> origin/unstable
     ForkedMaybeBlindedBeaconBlock |
     deneb_mev.SignedBlindedBeaconBlock |
     electra_mev.SignedBlindedBeaconBlock |
@@ -393,12 +403,18 @@ type
     seq[RestSyncCommitteeSelection]
 
   MevDecodeTypes* =
+<<<<<<< HEAD
     GetHeaderResponseDeneb |
     GetHeaderResponseElectra |
     GetHeaderResponseFulu |
     SubmitBlindedBlockResponseDeneb |
     SubmitBlindedBlockResponseElectra |
     SubmitBlindedBlockResponseFulu
+=======
+    GetHeaderResponseElectra |
+    GetHeaderResponseFulu |
+    SubmitBlindedBlockResponseElectra
+>>>>>>> origin/unstable
 
   DecodeTypes* =
     DataEnclosedObject |
@@ -409,6 +425,8 @@ type
     DataOptimisticAndFinalizedObject |
     GetBlockV2Response |
     GetDistributedKeystoresResponse |
+    GetHistoricalSummariesV1Response |
+    GetHistoricalSummariesV1ResponseElectra |
     GetKeystoresResponse |
     GetRemoteKeystoresResponse |
     GetStateForkResponse |
@@ -440,10 +458,42 @@ type
 
   RestBlockTypes* = phase0.BeaconBlock | altair.BeaconBlock |
                     bellatrix.BeaconBlock | capella.BeaconBlock |
+<<<<<<< HEAD
                     deneb.BlockContents | deneb_mev.BlindedBeaconBlock |
                     electra.BlockContents | fulu.BlockContents |
                     electra_mev.BlindedBeaconBlock |
                     fulu_mev.BlindedBeaconBlock
+=======
+                    deneb.BlockContents | electra.BlockContents |
+                    fulu.BlockContents | electra_mev.BlindedBeaconBlock |
+                    fulu_mev.BlindedBeaconBlock
+
+func ethHeaders(
+    consensusFork: ConsensusFork,
+    hasRestAllowedOrigin: bool): HttpTable =
+  var headers = HttpTable.init [
+    ("eth-consensus-version", consensusFork.toString())]
+  if hasRestAllowedOrigin:
+    headers.add("access-control-expose-headers", "eth-consensus-version")
+  headers
+
+func ethHeaders(
+    consensusFork: ConsensusFork,
+    isBlinded: bool,
+    executionValue: UInt256,
+    consensusValue: UInt256,
+    hasRestAllowedOrigin: bool): HttpTable =
+  var headers = HttpTable.init [
+    ("eth-consensus-version", consensusFork.toString()),
+    ("eth-execution-payload-blinded", if isBlinded: "true" else: "false"),
+    ("eth-execution-payload-value", toString(executionValue, 10)),
+    ("eth-consensus-block-value", toString(consensusValue, 10))]
+  if hasRestAllowedOrigin:
+    headers.add("access-control-expose-headers", static(
+      "eth-consensus-version, eth-execution-payload-blinded, " &
+      "eth-execution-payload-value, eth-consensus-block-value"))
+  headers
+>>>>>>> origin/unstable
 
 func readStrictHexChar(c: char, radix: static[uint8]): Result[int8, cstring] =
   ## Converts an hex char to an int
@@ -530,385 +580,281 @@ func strictParse*[bits: static[int]](input: string,
     inc(currentIndex)
   ok(res)
 
-proc prepareJsonResponse*(t: typedesc[RestApiResponse], d: auto): seq[byte] =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("data", d)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
-  res
+template withRestJsonWriter(w, typ, body: untyped): untyped =
+  try:
+    var stream = memoryOutput()
+    var w = JsonWriter[RestJson].init(stream)
+    body
+    stream.getOutput(typ)
+  except IOError:
+    raiseAssert "No IOError from memoryOutput"
+
+proc prepareJsonResponse*(_: typedesc[RestApiResponse], d: auto): seq[byte] =
+  withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("data", d)
 
 proc prepareJsonStringResponse*[T: SomeForkedLightClientObject](
-    t: typedesc[RestApiResponse], d: RestVersioned[T]): string =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      withForkyObject(d.data):
-        when lcDataFork > LightClientDataFork.None:
-          writer.beginRecord()
-          writer.writeField("version", d.jsonVersion.toString())
-          writer.writeField("data", forkyObject)
-          writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
+    _: typedesc[RestApiResponse], d: RestVersioned[T]): string =
+  withForkyObject(d.data):
+    when lcDataFork > LightClientDataFork.None:
+      withRestJsonWriter(w, string):
+        w.writeObject:
+          w.writeField("version", d.jsonVersion.toString())
+          w.writeField("data", forkyObject)
+    else:
       default(string)
-  res
 
-proc prepareJsonStringResponse*(t: typedesc[RestApiResponse], d: auto): string =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.writeValue(d)
-      stream.getOutput(string)
-    except IOError:
-      default(string)
-  res
+proc prepareJsonStringResponse*(_: typedesc[RestApiResponse], d: auto): string =
+  RestJson.encode(d)
 
-proc jsonResponseWRoot*(t: typedesc[RestApiResponse], data: auto,
+proc jsonResponseWRoot*(_: typedesc[RestApiResponse], data: auto,
                         dependent_root: Eth2Digest,
                         execOpt: Opt[bool]): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("dependent_root", dependent_root)
-      if execOpt.isSome():
-        writer.writeField("execution_optimistic", execOpt.get())
-      writer.writeField("data", data)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+  let res = withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("dependent_root", dependent_root)
+      w.writeField("execution_optimistic", execOpt)
+      w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonResponse*(t: typedesc[RestApiResponse], data: auto): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("data", data)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+proc jsonResponse*(_: typedesc[RestApiResponse], data: auto): RestApiResponse =
+  let res = withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonResponseBlock*(t: typedesc[RestApiResponse],
-                        data: ForkySignedBlindedBeaconBlock,
-                        consensusFork: ConsensusFork,
-                        execOpt: Opt[bool],
-                        finalized: bool): RestApiResponse =
+proc jsonResponseBlock*(
+    _: typedesc[RestApiResponse],
+    data: ForkySignedBlindedBeaconBlock,
+    execOpt: Opt[bool],
+    finalized: bool,
+    consensusFork: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
   let
-    headers = [("eth-consensus-version", consensusFork.toString())]
-    res =
-      try:
-        var stream = memoryOutput()
-        var writer = JsonWriter[RestJson].init(stream)
-        writer.beginRecord()
-        writer.writeField("version", consensusFork.toString())
-        if execOpt.isSome():
-          writer.writeField("execution_optimistic", execOpt.get())
-        writer.writeField("finalized", finalized)
-        writer.writeField("data", data)
-        writer.endRecord()
-        stream.getOutput(seq[byte])
-      except IOError:
-        default(seq[byte])
+    headers = consensusFork.ethHeaders(hasRestAllowedOrigin)
+    res = withRestJsonWriter(w, seq[byte]):
+      w.writeObject:
+        w.writeField("version", consensusFork)
+        w.writeField("execution_optimistic", execOpt)
+        w.writeField("finalized", finalized)
+        w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
-proc jsonResponseBlock*(t: typedesc[RestApiResponse],
-                        data: ForkedSignedBeaconBlock,
-                        execOpt: Opt[bool],
-                        finalized: bool): RestApiResponse =
+proc jsonResponseBlock*(
+    _: typedesc[RestApiResponse],
+    data: ForkedSignedBeaconBlock,
+    execOpt: Opt[bool],
+    finalized: bool,
+    hasRestAllowedOrigin: bool): RestApiResponse =
   let
-    headers = [("eth-consensus-version", data.kind.toString())]
-    res =
-      try:
-        var stream = memoryOutput()
-        var writer = JsonWriter[RestJson].init(stream)
-        writer.beginRecord()
-        writer.writeField("version", data.kind.toString())
-        if execOpt.isSome():
-          writer.writeField("execution_optimistic", execOpt.get())
-        writer.writeField("finalized", finalized)
+    headers = data.kind.ethHeaders(hasRestAllowedOrigin)
+    res = withRestJsonWriter(w, seq[byte]):
+      w.writeObject:
+        w.writeField("version", data.kind)
+        w.writeField("execution_optimistic", execOpt)
+        w.writeField("finalized", finalized)
         withBlck(data):
-          writer.writeField("data", forkyBlck)
-        writer.endRecord()
-        stream.getOutput(seq[byte])
-      except IOError:
-        default(seq[byte])
+          w.writeField("data", forkyBlck)
+
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
-proc jsonResponseState*(t: typedesc[RestApiResponse],
-                        data: ForkedHashedBeaconState,
-                        execOpt: Opt[bool]): RestApiResponse =
+proc jsonResponseState*(
+    _: typedesc[RestApiResponse],
+    data: ForkedHashedBeaconState,
+    execOpt: Opt[bool],
+    finalized: bool,
+    hasRestAllowedOrigin: bool): RestApiResponse =
   let
-    headers = [("eth-consensus-version", data.kind.toString())]
-    res =
-      try:
-        var stream = memoryOutput()
-        var writer = JsonWriter[RestJson].init(stream)
-        writer.beginRecord()
-        writer.writeField("version", data.kind.toString())
-        if execOpt.isSome():
-          writer.writeField("execution_optimistic", execOpt.get())
+    headers = data.kind.ethHeaders(hasRestAllowedOrigin)
+    res = withRestJsonWriter(w, seq[byte]):
+      w.writeObject:
+        w.writeField("version", data.kind)
+        w.writeField("execution_optimistic", execOpt)
+        w.writeField("finalized", finalized)
         withState(data):
-          writer.writeField("data", forkyState.data)
-        writer.endRecord()
-        stream.getOutput(seq[byte])
-      except IOError:
-        default(seq[byte])
+          w.writeField("data", forkyState.data)
+
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
-proc jsonResponseWOpt*(t: typedesc[RestApiResponse], data: auto,
+proc jsonResponseWOpt*(_: typedesc[RestApiResponse], data: auto,
                        execOpt: Opt[bool]): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      if execOpt.isSome():
-        writer.writeField("execution_optimistic", execOpt.get())
-      writer.writeField("data", data)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+  let res = withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("execution_optimistic", execOpt)
+      w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json")
 
 proc prepareJsonResponseFinalized*(
-    t: typedesc[RestApiResponse], data: auto, exec: Opt[bool],
+    _: typedesc[RestApiResponse], data: auto, exec: Opt[bool],
     finalized: bool
 ): seq[byte] =
-  try:
-    var
-      stream = memoryOutput()
-      writer = JsonWriter[RestJson].init(stream)
-    writer.beginRecord()
-    if exec.isSome():
-      writer.writeField("execution_optimistic", exec.get())
-    writer.writeField("finalized", finalized)
-    writer.writeField("data", data)
-    writer.endRecord()
-    stream.getOutput(seq[byte])
-  except IOError:
-    default(seq[byte])
+  withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("execution_optimistic", exec)
+      w.writeField("finalized", finalized)
+      w.writeField("data", data)
 
-proc jsonResponseFinalized*(t: typedesc[RestApiResponse], data: auto,
+proc jsonResponseFinalized*(_: typedesc[RestApiResponse], data: auto,
                             exec: Opt[bool],
                             finalized: bool): RestApiResponse =
   let res = RestApiResponse.prepareJsonResponseFinalized(data, exec, finalized)
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonResponseFinalizedWVersion*(t: typedesc[RestApiResponse],
-                            data: auto,
-                            exec: Opt[bool],
-                            finalized: bool,
-                            version: ConsensusFork): RestApiResponse =
+proc jsonResponseFinalizedWVersion*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    exec: Opt[bool],
+    finalized: bool,
+    version: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
   let
-    headers = [("eth-consensus-version", version.toString())]
-    res =
-      block:
-        var default: seq[byte]
-        try:
-          var stream = memoryOutput()
-          var writer = JsonWriter[RestJson].init(stream)
-          writer.beginRecord()
-          writer.writeField("version", version.toString())
-          if exec.isSome():
-            writer.writeField("execution_optimistic", exec.get())
-          writer.writeField("finalized", finalized)
-          writer.writeField("data", data)
-          writer.endRecord()
-          stream.getOutput(seq[byte])
-        except IOError:
-          default
+    headers = version.ethHeaders(hasRestAllowedOrigin)
+    res = withRestJsonWriter(w, seq[byte]):
+      w.writeObject:
+        w.writeField("version", version)
+        w.writeField("execution_optimistic", exec)
+        w.writeField("finalized", finalized)
+        w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
-proc jsonResponseWVersion*(t: typedesc[RestApiResponse], data: auto,
-                           version: ConsensusFork): RestApiResponse =
+proc jsonResponseWVersion*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    version: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
   let
-    headers = [("eth-consensus-version", version.toString())]
-    res =
-      try:
-        var stream = memoryOutput()
-        var writer = JsonWriter[RestJson].init(stream)
-        writer.beginRecord()
-        writer.writeField("version", version.toString())
-        writer.writeField("data", data)
-        writer.endRecord()
-        stream.getOutput(seq[byte])
-      except IOError:
-        default(seq[byte])
+    headers = version.ethHeaders(hasRestAllowedOrigin)
+    res = withRestJsonWriter(w, seq[byte]):
+      w.writeObject:
+        w.writeField("version", version)
+        w.writeField("data", data)
+
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
 proc jsonResponseVersioned*[T: SomeForkedLightClientObject](
-    t: typedesc[RestApiResponse],
+    _: typedesc[RestApiResponse],
     entries: openArray[RestVersioned[T]]): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      for e in writer.stepwiseArrayCreation(entries):
+  let res = withRestJsonWriter(w, seq[byte]):
+      for e in w.stepwiseArrayCreation(entries):
         withForkyObject(e.data):
           when lcDataFork > LightClientDataFork.None:
-            writer.beginRecord()
-            writer.writeField("version", e.jsonVersion.toString())
-            writer.writeField("data", forkyObject)
-            writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+            w.writeObject:
+              w.writeField("version", e.jsonVersion.toString())
+              w.writeField("data", forkyObject)
+
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonResponsePlain*(t: typedesc[RestApiResponse],
+proc jsonPlainEncoded(data: auto): seq[byte] =
+  withRestJsonWriter(w, seq[byte]):
+    w.writeValue(data)
+
+proc jsonResponsePlain*(_: typedesc[RestApiResponse],
                         data: auto): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.writeValue(data)
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+  let res = data.jsonPlainEncoded()
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonResponsePlain*(t: typedesc[RestApiResponse],
-                        data: auto, headers: HttpTable): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.writeValue(data)
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+proc jsonResponsePlain*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    consensusFork: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
+  let
+    res = data.jsonPlainEncoded()
+    headers = consensusFork.ethHeaders(hasRestAllowedOrigin)
   RestApiResponse.response(res, Http200, "application/json", headers = headers)
 
-proc jsonResponseWMeta*(t: typedesc[RestApiResponse],
+proc jsonResponsePlain*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    consensusFork: ConsensusFork,
+    isBlinded: bool,
+    executionValue: UInt256,
+    consensusValue: UInt256,
+    hasRestAllowedOrigin: bool): RestApiResponse =
+  let
+    res = data.jsonPlainEncoded()
+    headers = consensusFork.ethHeaders(
+      isBlinded, executionValue, consensusValue, hasRestAllowedOrigin)
+  RestApiResponse.response(res, Http200, "application/json", headers = headers)
+
+proc jsonResponseWMeta*(_: typedesc[RestApiResponse],
                         data: auto, meta: auto): RestApiResponse =
-  let res =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("data", data)
-      writer.writeField("meta", meta)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+  let res = withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("data", data)
+      w.writeField("meta", meta)
+
   RestApiResponse.response(res, Http200, "application/json")
 
-proc jsonMsgResponse*(t: typedesc[RestApiResponse],
+proc jsonMsgResponse*(_: typedesc[RestApiResponse],
                       msg: string = ""): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", 200)
-      writer.writeField("message", msg)
-      writer.endRecord()
-      stream.getOutput(seq[byte])
-    except IOError:
-      default(seq[byte])
+  let data = withRestJsonWriter(w, seq[byte]):
+    w.writeObject:
+      w.writeField("code", 200)
+      w.writeField("message", msg)
+
   RestApiResponse.response(data, Http200, "application/json")
 
-proc jsonError*(t: typedesc[RestApiResponse], status: HttpCode = Http200,
+proc jsonError*(_: typedesc[RestApiResponse], status: HttpCode = Http200,
                 msg: string = ""): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", int(status.toInt()))
-      writer.writeField("message", msg)
-      writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
-      default(string)
+  let data = withRestJsonWriter(w, string):
+    w.writeObject:
+      w.writeField("code", int(status.toInt()))
+      w.writeField("message", msg)
+
   RestApiResponse.error(status, data, "application/json")
 
-proc jsonError*(t: typedesc[RestApiResponse], status: HttpCode = Http200,
+proc jsonError*(_: typedesc[RestApiResponse], status: HttpCode = Http200,
                 msg: string = "", stacktrace: string): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", int(status.toInt()))
-      writer.writeField("message", msg)
+  let data = withRestJsonWriter(w, string):
+    w.writeObject:
+      w.writeField("code", int(status.toInt()))
+      w.writeField("message", msg)
       if len(stacktrace) > 0:
-        writer.writeField("stacktraces", [stacktrace])
-      writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
-      default(string)
+        w.writeField("stacktraces", [stacktrace])
+
   RestApiResponse.error(status, data, "application/json")
 
-proc jsonError*(t: typedesc[RestApiResponse], status: HttpCode = Http200,
+proc jsonError*(_: typedesc[RestApiResponse], status: HttpCode = Http200,
                 msg: string = "",
                 stacktraces: openArray[string]): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", int(status.toInt()))
-      writer.writeField("message", msg)
-      writer.writeField("stacktraces", stacktraces)
-      writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
-      default(string)
+  let data = withRestJsonWriter(w, string):
+    w.writeObject:
+      w.writeField("code", int(status.toInt()))
+      w.writeField("message", msg)
+      w.writeField("stacktraces", stacktraces)
+
   RestApiResponse.error(status, data, "application/json")
 
-proc jsonError*(t: typedesc[RestApiResponse],
+proc jsonError*(_: typedesc[RestApiResponse],
                 rmsg: RestErrorMessage): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", rmsg.code)
-      writer.writeField("message", rmsg.message)
-      if rmsg.stacktraces.isSome():
-        writer.writeField("stacktraces", rmsg.stacktraces)
-      writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
-      default(string)
+  let data = withRestJsonWriter(w, string):
+    w.writeObject:
+      w.writeField("code", rmsg.code)
+      w.writeField("message", rmsg.message)
+      w.writeField("stacktraces", rmsg.stacktraces)
+
   RestApiResponse.error(rmsg.code.toHttpCode().get(), data, "application/json")
 
-proc jsonErrorList*(t: typedesc[RestApiResponse],
+proc jsonErrorList*(_: typedesc[RestApiResponse],
                     status: HttpCode = Http200,
                     msg: string = "", failures: auto): RestApiResponse =
-  let data =
-    try:
-      var stream = memoryOutput()
-      var writer = JsonWriter[RestJson].init(stream)
-      writer.beginRecord()
-      writer.writeField("code", int(status.toInt()))
-      writer.writeField("message", msg)
-      writer.writeField("failures", failures)
-      writer.endRecord()
-      stream.getOutput(string)
-    except IOError:
-      default(string)
+  let data = withRestJsonWriter(w, string):
+    w.writeObject:
+      w.writeField("code", int(status.toInt()))
+      w.writeField("message", msg)
+      w.writeField("failures", failures)
+
   RestApiResponse.error(status, data, "application/json")
 
 proc sszResponseVersioned*[T: SomeForkedLightClientObject](
-    t: typedesc[RestApiResponse],
+    _: typedesc[RestApiResponse],
     entries: openArray[RestVersioned[T]]): RestApiResponse =
   let res =
     try:
@@ -919,14 +865,15 @@ proc sszResponseVersioned*[T: SomeForkedLightClientObject](
             var cursor = stream.delayFixedSizeWrite(sizeof(uint64))
             let initPos = stream.pos
             stream.write e.sszContext.data
-            var writer = SszWriter.init(stream)
-            writer.writeValue forkyUpdate
+            var w = SszWriter.init(stream)
+            w.writeValue forkyUpdate
             cursor.finalWrite (stream.pos - initPos).uint64.toBytesLE()
       stream.getOutput(seq[byte])
     except IOError:
       default(seq[byte])
   RestApiResponse.response(res, Http200, "application/octet-stream")
 
+<<<<<<< HEAD
 proc sszResponsePlain*(t: typedesc[RestApiResponse], res: seq[byte],
                        headers: openArray[RestKeyValueTuple] = []
                       ): RestApiResponse =
@@ -2913,6 +2860,42 @@ proc readValue*(reader: var JsonReader[RestJson],
         RestJson.decode(
           string(data.get()), consensusFork.BlockContents,
           requireAllFields = true, allowUnknownFields = true))
+=======
+proc sszResponsePlain*(
+    _: typedesc[RestApiResponse],
+    res: seq[byte],
+    consensusFork: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
+  let headers = consensusFork.ethHeaders(hasRestAllowedOrigin)
+  RestApiResponse.response(
+    res, Http200, "application/octet-stream", headers = headers)
+
+proc sszResponse*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    consensusFork: ConsensusFork,
+    hasRestAllowedOrigin: bool): RestApiResponse =
+  let
+    res = SSZ.encode(data)
+    headers = consensusFork.ethHeaders(hasRestAllowedOrigin)
+  RestApiResponse.response(
+    res, Http200, "application/octet-stream", headers = headers)
+
+proc sszResponse*(
+    _: typedesc[RestApiResponse],
+    data: auto,
+    consensusFork: ConsensusFork,
+    isBlinded: bool,
+    executionValue: UInt256,
+    consensusValue: UInt256,
+    hasRestAllowedOrigin: bool): RestApiResponse =
+  let
+    res = SSZ.encode(data)
+    headers = consensusFork.ethHeaders(
+      isBlinded, executionValue, consensusValue, hasRestAllowedOrigin)
+  RestApiResponse.response(
+    res, Http200, "application/octet-stream", headers = headers)
+>>>>>>> origin/unstable
 
 proc parseRoot(value: string): Result[Eth2Digest, cstring] =
   try:
@@ -2920,20 +2903,8 @@ proc parseRoot(value: string): Result[Eth2Digest, cstring] =
   except ValueError:
     err("Unable to decode root value")
 
-## GraffitiString
-proc writeValue*(writer: var JsonWriter[RestJson], value: GraffitiString) {.
-     raises: [IOError].} =
-  writeValue(writer, $value)
-
-proc readValue*(reader: var JsonReader[RestJson], T: type GraffitiString): T {.
-     raises: [IOError, SerializationError].} =
-  let res = init(GraffitiString, reader.readValue(string))
-  if res.isErr():
-    reader.raiseUnexpectedValue res.error
-  res.get
-
 proc decodeBody*(
-       t: typedesc[RestPublishedSignedBeaconBlock],
+       _: typedesc[RestPublishedSignedBeaconBlock],
        body: ContentBody,
        version: string
      ): Result[RestPublishedSignedBeaconBlock, RestErrorMessage] =
@@ -2942,29 +2913,23 @@ proc decodeBody*(
       return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
                                        [version, $error]))
 
-    template getBlck(blckType: untyped): untyped =
-      try:
-        RestPublishedSignedBeaconBlock(ForkedSignedBeaconBlock.init(
-          RestJson.decode(body.data, blckType,
-                          requireAllFields = true,
-                          allowUnknownFields = true)))
-      except SerializationError as exc:
-        debug "Failed to decode JSON data",
-              err = exc.formatMsg("<data>"),
-              data = string.fromBytes(body.data)
-        return err(RestErrorMessage.init(Http400, UnableDecodeError,
-                                         [version, exc.formatMsg("<data>")]))
-      except CatchableError as exc:
-        return err(RestErrorMessage.init(Http400, UnexpectedDecodeError,
-                                         [version, $exc.msg]))
+    try:
+      var res = ForkedSignedBeaconBlock(kind: consensusFork)
+      withBlck(res):
+        forkyBlck = RestJson.decode(body.data, typeof(forkyBlck))
 
-    withConsensusFork(consensusFork):
-      ok(getBlck(consensusFork.SignedBeaconBlock))
-
+      ok RestPublishedSignedBeaconBlock(res)
+    except SerializationError as exc:
+      debug "Failed to decode JSON data",
+        err = exc.formatMsg("<data>"), data = string.fromBytes(body.data)
+      err RestErrorMessage.init(
+        Http400, UnableDecodeError, [version, exc.formatMsg("<data>")]
+      )
   elif body.contentType == OctetStreamMediaType:
     let consensusFork = ConsensusFork.decodeString(version).valueOr:
       return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
                                        [version, $error]))
+<<<<<<< HEAD
     case consensusFork
     of ConsensusFork.Phase0:
       let blck =
@@ -3043,12 +3008,24 @@ proc decodeBody*(
           return err(RestErrorMessage.init(Http400, UnexpectedDecodeError,
                                            [version, $exc.msg]))
       ok(RestPublishedSignedBeaconBlock(ForkedSignedBeaconBlock.init(blck)))
+=======
+    try:
+      var res = ForkedSignedBeaconBlock(kind: consensusFork)
+      withBlck(res):
+        forkyBlck = SSZ.decode(body.data, typeof(forkyBlck))
+
+      ok RestPublishedSignedBeaconBlock(res)
+    except SerializationError as exc:
+      err RestErrorMessage.init(
+        Http400, UnableDecodeError, [version, exc.formatMsg("<data>")]
+      )
+>>>>>>> origin/unstable
   else:
     err(RestErrorMessage.init(Http415, InvalidContentTypeError,
                               [version, $body.contentType]))
 
 proc decodeBody*(
-       t: typedesc[RestPublishedSignedBlockContents],
+       _: typedesc[RestPublishedSignedBlockContents],
        body: ContentBody,
        version: string
      ): Result[RestPublishedSignedBlockContents, RestErrorMessage] =
@@ -3057,6 +3034,7 @@ proc decodeBody*(
       return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
                                        [version, $error]))
 
+<<<<<<< HEAD
     template getBlck(blckType: untyped): untyped =
       try:
         var res = RestJson.decode(body.data, blckType,
@@ -3136,10 +3114,24 @@ proc decodeBody*(
                                            [version, $exc.msg]))
 
     ok(data)
+=======
+    try:
+      var res = RestPublishedSignedBlockContents(kind: consensusFork)
+      withForkyBlck(res):
+        forkyData = RestJson.decode(body.data, typeof(forkyData))
+      ok res
+    except SerializationError as exc:
+      debug "Failed to decode JSON data",
+        err = exc.formatMsg("<data>"), data = string.fromBytes(body.data)
+      err RestErrorMessage.init(
+        Http400, UnableDecodeError, [version, exc.formatMsg("<data>")]
+      )
+>>>>>>> origin/unstable
   elif body.contentType == OctetStreamMediaType:
     let consensusFork = ConsensusFork.decodeString(version).valueOr:
       return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
                                        [version, $error]))
+<<<<<<< HEAD
     case consensusFork
     of ConsensusFork.Phase0:
       let blck =
@@ -3239,6 +3231,17 @@ proc decodeBody*(
                                            [version, $exc.msg]))
       ok(RestPublishedSignedBlockContents(
         kind: ConsensusFork.Fulu, fuluData: blckContents))
+=======
+    try:
+      var res = RestPublishedSignedBlockContents(kind: consensusFork)
+      withForkyBlck(res):
+        forkyData = SSZ.decode(body.data, typeof(forkyData))
+      ok res
+    except SerializationError as exc:
+      err RestErrorMessage.init(
+        Http400, UnableDecodeError, [version, exc.formatMsg("<data>")]
+      )
+>>>>>>> origin/unstable
   else:
     err(RestErrorMessage.init(Http415, InvalidContentTypeError,
                               [version, $body.contentType]))
@@ -3247,6 +3250,7 @@ proc decodeBodyJsonOrSsz*(
     t: typedesc[seq[SignedValidatorRegistrationV1]],
     body: ContentBody
 ): Result[seq[SignedValidatorRegistrationV1], RestErrorMessage] =
+<<<<<<< HEAD
   if body.contentType == ApplicationJsonMediaType:
     let data =
       try:
@@ -3356,43 +3360,132 @@ proc decodeBody*[T](t: typedesc[T],
 
 proc decodeBodyJsonOrSsz*[T](t: typedesc[T],
                              body: ContentBody): Result[T, RestErrorMessage] =
+=======
+>>>>>>> origin/unstable
   if body.contentType == ApplicationJsonMediaType:
     let data =
       try:
-        RestJson.decode(body.data, T,
-                        requireAllFields = true,
-                        allowUnknownFields = true)
+        RestJson.decode(
+          body.data,
+          seq[SignedValidatorRegistrationV1])
       except SerializationError as exc:
-        debug "Failed to decode JSON data",
-              err = exc.formatMsg("<data>"),
-              data = string.fromBytes(body.data)
+        debug "Failed to deserialize REST JSON data",
+              err = exc.formatMsg("<data>")
         return err(
           RestErrorMessage.init(Http400, UnableDecodeError,
                                 [exc.formatMsg("<data>")]))
-      except CatchableError as exc:
-        return err(
-            RestErrorMessage.init(Http400, UnexpectedDecodeError, [$exc.msg]))
     ok(data)
   elif body.contentType == OctetStreamMediaType:
-    let blck =
+    let data =
       try:
-        SSZ.decode(body.data, T)
+        SSZ.decode(
+          body.data,
+          List[SignedValidatorRegistrationV1, Limit VALIDATOR_REGISTRY_LIMIT])
       except SerializationError as exc:
+        debug "Failed to deserialize REST SSZ data",
+              err = exc.formatMsg("<data>")
         return err(
           RestErrorMessage.init(Http400, UnableDecodeError,
                                 [exc.formatMsg("<data>")]))
-      except CatchableError as exc:
-        return err(
-            RestErrorMessage.init(Http400, UnexpectedDecodeError, [$exc.msg]))
-    ok(blck)
+    ok(data.asSeq)
   else:
     err(RestErrorMessage.init(Http415, InvalidContentTypeError,
                               [$body.contentType]))
 
+<<<<<<< HEAD
+=======
+proc decodeBytesJsonOrSsz*(
+    T: typedesc[MevDecodeTypes],
+    data: openArray[byte],
+    contentType: Opt[ContentTypeData],
+    version: string
+): Result[T, RestErrorMessage] =
+  var res: T
+  const typeFork = kind(typeof(res.data))
+
+  if contentType == ApplicationJsonMediaType:
+    res =
+      try:
+        RestJson.decode(data, T)
+      except SerializationError as exc:
+        debug "Failed to deserialize REST JSON data",
+              err = exc.formatMsg("<data>")
+        return err(
+          RestErrorMessage.init(Http400, UnableDecodeError,
+                                [exc.formatMsg("<data>")]))
+    let jsonFork = ConsensusFork.decodeString(res.version.getStr()).valueOr:
+      return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
+                                       [res.version.getStr(), $error]))
+    if typeFork != jsonFork:
+      return err(
+        RestErrorMessage.init(Http400, UnexpectedForkVersionError,
+                              ["json-version", res.version.getStr(),
+                               typeFork.toString()]))
+    ok(res)
+  elif contentType == OctetStreamMediaType:
+    let consensusFork =
+      ConsensusFork.decodeString(version).valueOr:
+        return err(RestErrorMessage.init(Http400, UnableDecodeVersionError,
+                                         [version, $error]))
+    if typeFork != consensusFork:
+      return err(
+        RestErrorMessage.init(
+          Http400, UnexpectedForkVersionError,
+          ["eth-consensus-version", consensusFork.toString(),
+           typeFork.toString()]))
+
+    ok(T(
+      version: newJString(typeFork.toString()),
+      data:
+        try:
+          SSZ.decode(data, typeof(res.data))
+        except SerializationError as exc:
+          return err(
+            RestErrorMessage.init(Http400, UnableDecodeError,
+                                  [exc.formatMsg("<data>")]))))
+  else:
+    err(RestErrorMessage.init(Http415, InvalidContentTypeError,
+                              [$contentType]))
+
+proc decodeBody*(T: typedesc, body: ContentBody): Result[T, cstring] =
+  if body.contentType != ApplicationJsonMediaType:
+    return err("Unsupported content type")
+
+  try:
+    ok RestJson.decode(body.data, T)
+  except SerializationError as exc:
+    debug "Failed to deserialize REST JSON data",
+          err = exc.formatMsg("<data>"),
+          data = string.fromBytes(body.data)
+    err("Unable to deserialize data")
+
+proc decodeBodyJsonOrSsz*(T: typedesc,
+                          body: ContentBody): Result[T, RestErrorMessage] =
+  if body.contentType == ApplicationJsonMediaType:
+    try:
+      ok RestJson.decode(body.data, T)
+    except SerializationError as exc:
+      debug "Failed to decode JSON data",
+            err = exc.formatMsg("<data>"),
+            data = string.fromBytes(body.data)
+      err(RestErrorMessage.init(Http400, UnableDecodeError,
+                                [exc.formatMsg("<data>")]))
+  elif body.contentType == OctetStreamMediaType:
+    try:
+      ok SSZ.decode(body.data, T)
+    except SerializationError as exc:
+      err(RestErrorMessage.init(Http400, UnableDecodeError,
+                                [exc.formatMsg("<data>")]))
+  else:
+    err(RestErrorMessage.init(Http415, InvalidContentTypeError,
+                              [$body.contentType]))
+
+>>>>>>> origin/unstable
 proc encodeBytes*(value: seq[SignedValidatorRegistrationV1],
                   contentType: string): RestResult[seq[byte]] =
   case contentType
   of "application/json":
+<<<<<<< HEAD
     try:
       var
         stream = memoryOutput()
@@ -3411,6 +3504,16 @@ proc encodeBytes*(value: seq[SignedValidatorRegistrationV1],
           value)))
     except SerializationError:
       return err("Serialization error")
+=======
+    ok block:
+      withRestJsonWriter(w, seq[byte]):
+        w.writeArray(value)
+  of "application/octet-stream":
+    ok(SSZ.encode(
+      init(
+        List[SignedValidatorRegistrationV1, Limit VALIDATOR_REGISTRY_LIMIT],
+        value)))
+>>>>>>> origin/unstable
   else:
     err("Content-Type not supported")
 
@@ -3418,18 +3521,9 @@ proc encodeBytes*[T: EncodeTypes](value: T,
                                   contentType: string): RestResult[seq[byte]] =
   case contentType
   of "application/json":
-    let data =
-      block:
-        try:
-          var stream = memoryOutput()
-          var writer = JsonWriter[RestJson].init(stream)
-          writer.writeValue(value)
-          stream.getOutput(seq[byte])
-        except IOError:
-          return err("Input/output error")
-        except SerializationError:
-          return err("Serialization error")
-    ok(data)
+    ok block:
+      withRestJsonWriter(w, seq[byte]):
+        w.writeValue(value)
   else:
     err("Content-Type not supported")
 
@@ -3437,18 +3531,9 @@ proc encodeBytes*[T: EncodeArrays](value: T,
                                    contentType: string): RestResult[seq[byte]] =
   case contentType
   of "application/json":
-    let data =
-      block:
-        try:
-          var stream = memoryOutput()
-          var writer = JsonWriter[RestJson].init(stream)
-          writer.writeArray(value)
-          stream.getOutput(seq[byte])
-        except IOError:
-          return err("Input/output error")
-        except SerializationError:
-          return err("Serialization error")
-    ok(data)
+    ok block:
+      withRestJsonWriter(w, seq[byte]):
+        w.writeArray(value)
   else:
     err("Content-Type not supported")
 
@@ -3458,6 +3543,7 @@ proc encodeBytes*[T: EncodeOctetTypes](
 ): RestResult[seq[byte]] =
   case contentType
   of "application/json":
+<<<<<<< HEAD
     try:
       var
         stream = memoryOutput()
@@ -3473,6 +3559,13 @@ proc encodeBytes*[T: EncodeOctetTypes](
       ok(SSZ.encode(value))
     except CatchableError:
       err("Serialization error")
+=======
+    ok block:
+      withRestJsonWriter(w, seq[byte]):
+        w.writeValue(value)
+  of "application/octet-stream":
+    ok(SSZ.encode(value))
+>>>>>>> origin/unstable
   else:
     err("Content-Type not supported")
 
@@ -3506,9 +3599,7 @@ proc decodeBytes*[T: ProduceBlockResponseV3](
 
   if mediaType == ApplicationJsonMediaType:
     try:
-      ok(RestJson.decode(value, T,
-                         requireAllFields = true,
-                         allowUnknownFields = true))
+      ok(RestJson.decode(value, T))
     except SerializationError as exc:
       debug "Failed to deserialize REST JSON data",
             err = exc.formatMsg("<data>"),
@@ -3542,7 +3633,10 @@ proc decodeBytes*[T: ProduceBlockResponseV3](
           except ValueError:
             return err("Incorrect `Eth-Consensus-Block-Value` header value")
     withConsensusFork(fork):
-      when consensusFork >= ConsensusFork.Deneb:
+      debugGloasComment ""
+      when consensusFork == ConsensusFork.Gloas:
+        return err("gloas produceblockv3 not available yet")
+      elif consensusFork >= ConsensusFork.Electra:
         if blinded:
           let contents =
             ? readSszResBytes(consensusFork.BlindedBlockContents, value)
@@ -3587,9 +3681,7 @@ proc decodeBytes*[T: DecodeTypes](
 
   if mediaType == ApplicationJsonMediaType:
     try:
-      ok RestJson.decode(value, T,
-                         requireAllFields = true,
-                         allowUnknownFields = true)
+      ok RestJson.decode(value, T)
     except SerializationError as exc:
       debug "Failed to deserialize REST JSON data",
             err = exc.formatMsg("<data>"),
@@ -3612,30 +3704,30 @@ func encodeString*(
   ok(Base10.toString(uint64(value)))
 
 func encodeString*(value: ValidatorSig): RestResult[string] =
-  ok(hexOriginal(toRaw(value)))
+  ok(to0xHex(toRaw(value)))
 
 func encodeString*(value: GraffitiBytes): RestResult[string] =
-  ok(hexOriginal(distinctBase(value)))
+  ok(to0xHex(distinctBase(value)))
 
 func encodeString*(value: Eth2Digest): RestResult[string] =
-  ok(hexOriginal(value.data))
+  ok(to0xHex(value.data))
 
 func encodeString*(value: ValidatorIdent): RestResult[string] =
   case value.kind
   of ValidatorQueryKind.Index:
     ok(Base10.toString(uint64(value.index)))
   of ValidatorQueryKind.Key:
-    ok(hexOriginal(toRaw(value.key)))
+    ok(to0xHex(toRaw(value.key)))
 
 func encodeString*(value: ValidatorPubKey): RestResult[string] =
-  ok(hexOriginal(toRaw(value)))
+  ok(to0xHex(toRaw(value)))
 
 func encodeString*(value: StateIdent): RestResult[string] =
   case value.kind
   of StateQueryKind.Slot:
     ok(Base10.toString(uint64(value.slot)))
   of StateQueryKind.Root:
-    ok(hexOriginal(value.root.data))
+    ok(to0xHex(value.root.data))
   of StateQueryKind.Named:
     case value.value
     of StateIdentType.Head:
@@ -3661,7 +3753,7 @@ func encodeString*(value: BlockIdent): RestResult[string] =
   of BlockQueryKind.Slot:
     ok(Base10.toString(uint64(value.slot)))
   of BlockQueryKind.Root:
-    ok(hexOriginal(value.root.data))
+    ok(to0xHex(value.root.data))
   of BlockQueryKind.Named:
     case value.value
     of BlockIdentType.Head:
@@ -3739,6 +3831,8 @@ func decodeString*(t: typedesc[EventTopic],
     ok(EventTopic.AttesterSlashing)
   of "blob_sidecar":
     ok(EventTopic.BlobSidecar)
+  of "data_column_sidecar":
+    ok(EventTopic.DataColumnSidecar)
   of "finalized_checkpoint":
     ok(EventTopic.FinalizedCheckpoint)
   of "chain_reorg":
@@ -3774,6 +3868,8 @@ func encodeString*(value: set[EventTopic]): Result[string, cstring] =
     res.add("attester_slashing,")
   if EventTopic.BlobSidecar in value:
     res.add("blob_sidecar,")
+  if EventTopic.DataColumnSidecar in value:
+    res.add("data_column_sidecar,")
   if EventTopic.FinalizedCheckpoint in value:
     res.add("finalized_checkpoint,")
   if EventTopic.ChainReorg in value:
@@ -3788,45 +3884,6 @@ func encodeString*(value: set[EventTopic]): Result[string, cstring] =
     return err("Topics set must not be empty")
   res.setLen(len(res) - 1)
   ok(res)
-
-func toList*(value: set[ValidatorFilterKind]): seq[string] =
-  const
-    pendingSet = {ValidatorFilterKind.PendingInitialized,
-                  ValidatorFilterKind.PendingQueued}
-    activeSet = {ValidatorFilterKind.ActiveOngoing,
-                 ValidatorFilterKind.ActiveExiting,
-                 ValidatorFilterKind.ActiveSlashed}
-    exitedSet = {ValidatorFilterKind.ExitedUnslashed,
-                 ValidatorFilterKind.ExitedSlashed}
-    withdrawSet = {ValidatorFilterKind.WithdrawalPossible,
-                   ValidatorFilterKind.WithdrawalDone}
-  var
-    res: seq[string]
-    v = value
-
-  template processSet(argSet, argName: untyped): untyped =
-    if argSet * v == argSet:
-      res.add(argName)
-      v.excl(argSet)
-
-  template processSingle(argSingle, argName): untyped =
-    if argSingle in v:
-      res.add(argName)
-
-  processSet(pendingSet, "pending")
-  processSet(activeSet, "active")
-  processSet(exitedSet, "exited")
-  processSet(withdrawSet, "withdrawal")
-  processSingle(ValidatorFilterKind.PendingInitialized, "pending_initialized")
-  processSingle(ValidatorFilterKind.PendingQueued, "pending_queued")
-  processSingle(ValidatorFilterKind.ActiveOngoing, "active_ongoing")
-  processSingle(ValidatorFilterKind.ActiveExiting, "active_exiting")
-  processSingle(ValidatorFilterKind.ActiveSlashed, "active_slashed")
-  processSingle(ValidatorFilterKind.ExitedUnslashed, "exited_unslashed")
-  processSingle(ValidatorFilterKind.ExitedSlashed, "exited_slashed")
-  processSingle(ValidatorFilterKind.WithdrawalPossible, "withdrawal_possible")
-  processSingle(ValidatorFilterKind.WithdrawalDone, "withdrawal_done")
-  res
 
 func decodeString*(t: typedesc[ValidatorSig],
                    value: string): Result[ValidatorSig, cstring] =
@@ -3948,24 +4005,7 @@ func decodeString*(t: typedesc[BroadcastValidationType],
 
 func decodeString*(t: typedesc[ValidatorIdent],
                    value: string): Result[ValidatorIdent, cstring] =
-  if len(value) > 2:
-    if (value[0] == '0') and (value[1] == 'x'):
-      if len(value) != ValidatorKeySize + 2:
-        err("Incorrect validator's key value length")
-      else:
-        let res = ? ValidatorPubKey.fromHex(value)
-        ok(ValidatorIdent(kind: ValidatorQueryKind.Key,
-                          key: res))
-    elif (value[0] in DecimalSet) and (value[1] in DecimalSet):
-      let res = ? Base10.decode(uint64, value)
-      ok(ValidatorIdent(kind: ValidatorQueryKind.Index,
-                        index: RestValidatorIndex(res)))
-    else:
-      err("Incorrect validator identifier value")
-  else:
-    let res = ? Base10.decode(uint64, value)
-    ok(ValidatorIdent(kind: ValidatorQueryKind.Index,
-                      index: RestValidatorIndex(res)))
+  ValidatorIdent.parse(value)
 
 func decodeString*(t: typedesc[PeerId],
                    value: string): Result[PeerId, cstring] =
@@ -3991,65 +4031,19 @@ func decodeString*(t: typedesc[Eth2Digest],
 
 func decodeString*(t: typedesc[ValidatorFilter],
                    value: string): Result[ValidatorFilter, cstring] =
-  case value
-  of "pending_initialized":
-    ok({ValidatorFilterKind.PendingInitialized})
-  of "pending_queued":
-    ok({ValidatorFilterKind.PendingQueued})
-  of "active_ongoing":
-    ok({ValidatorFilterKind.ActiveOngoing})
-  of "active_exiting":
-    ok({ValidatorFilterKind.ActiveExiting})
-  of "active_slashed":
-    ok({ValidatorFilterKind.ActiveSlashed})
-  of "exited_unslashed":
-    ok({ValidatorFilterKind.ExitedUnslashed})
-  of "exited_slashed":
-    ok({ValidatorFilterKind.ExitedSlashed})
-  of "withdrawal_possible":
-    ok({ValidatorFilterKind.WithdrawalPossible})
-  of "withdrawal_done":
-    ok({ValidatorFilterKind.WithdrawalDone})
-  of "pending":
-    ok({
-      ValidatorFilterKind.PendingInitialized,
-      ValidatorFilterKind.PendingQueued
-    })
-  of "active":
-    ok({
-      ValidatorFilterKind.ActiveOngoing,
-      ValidatorFilterKind.ActiveExiting,
-      ValidatorFilterKind.ActiveSlashed
-    })
-  of "exited":
-    ok({
-      ValidatorFilterKind.ExitedUnslashed,
-      ValidatorFilterKind.ExitedSlashed
-    })
-  of "withdrawal":
-    ok({
-      ValidatorFilterKind.WithdrawalPossible,
-      ValidatorFilterKind.WithdrawalDone
-    })
-  else:
-    err("Incorrect validator state identifier value")
-
+  ValidatorFilter.parse(value)
 func decodeString*(t: typedesc[ConsensusFork],
                    value: string): Result[ConsensusFork, cstring] =
-  let vres = ConsensusFork.init(toLowerAscii(value))
-  if vres.isSome:
-    ok(vres.get)
-  else:
+  ConsensusFork.init(toLowerAscii(value)) or
     err("Unsupported or invalid beacon block fork version")
 
 proc decodeString*(t: typedesc[EventBeaconBlockObject],
                    value: string): Result[EventBeaconBlockObject, string] =
   try:
-    ok(RestJson.decode(value, t,
-                       requireAllFields = true,
-                       allowUnknownFields = true))
+    ok(RestJson.decode(value, t))
   except SerializationError as exc:
     err(exc.formatMsg("<data>"))
+<<<<<<< HEAD
 
 ## ValidatorIdent
 proc writeValue*(w: var JsonWriter[RestJson],
@@ -4203,3 +4197,5 @@ proc writeValue*(writer: var JsonWriter[RestJson],
   withAttestation(attestation):
     writer.writeField("data", forkyAttestation)
   writer.endRecord()
+=======
+>>>>>>> origin/unstable

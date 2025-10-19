@@ -47,6 +47,17 @@ func readValue*(r: var JsonReader, a: var seq[byte]) =
 func genesisTestRuntimeConfig*(consensusFork: ConsensusFork): RuntimeConfig =
   var res = defaultRuntimeConfig
   case consensusFork
+<<<<<<< HEAD
+=======
+  of ConsensusFork.Gloas:
+    res.GLOAS_FORK_EPOCH = GENESIS_EPOCH
+    res.FULU_FORK_EPOCH = GENESIS_EPOCH
+    res.ELECTRA_FORK_EPOCH = GENESIS_EPOCH
+    res.DENEB_FORK_EPOCH = GENESIS_EPOCH
+    res.CAPELLA_FORK_EPOCH = GENESIS_EPOCH
+    res.BELLATRIX_FORK_EPOCH = GENESIS_EPOCH
+    res.ALTAIR_FORK_EPOCH = GENESIS_EPOCH
+>>>>>>> origin/unstable
   of ConsensusFork.Fulu:
     res.FULU_FORK_EPOCH = GENESIS_EPOCH
     res.ELECTRA_FORK_EPOCH = GENESIS_EPOCH
@@ -90,7 +101,11 @@ type
     rewards*: List[Gwei, Limit VALIDATOR_REGISTRY_LIMIT]
     penalties*: List[Gwei, Limit VALIDATOR_REGISTRY_LIMIT]
 
+<<<<<<< HEAD
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.2/specs/phase0/validator.md#eth1block
+=======
+  # https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/phase0/validator.md#eth1block
+>>>>>>> origin/unstable
   Eth1Block* = object
     timestamp*: uint64
     deposit_root*: Eth2Digest
@@ -181,7 +196,12 @@ proc loadBlock*(
     validateBlockHash = true): auto =
   var blck = parseTest(path, SSZ, consensusFork.SignedBeaconBlock)
   blck.root = hash_tree_root(blck.message)
+<<<<<<< HEAD
   when consensusFork >= ConsensusFork.Bellatrix:
+=======
+  debugGloasComment ""
+  when consensusFork >= ConsensusFork.Bellatrix and consensusFork != ConsensusFork.Gloas:
+>>>>>>> origin/unstable
     if blck.message.is_execution_block and
         not blck.message.body.execution_payload.transactions.anyIt(it.len == 0):
       if blck.message.body.execution_payload.block_hash !=

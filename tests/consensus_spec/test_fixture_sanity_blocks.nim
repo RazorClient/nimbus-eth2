@@ -5,7 +5,7 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
-{.push raises: [].}
+{.push raises: [], gcsafe.}
 {.used.}
 
 import
@@ -21,7 +21,10 @@ from ../../beacon_chain/spec/presets import
 from ./fixtures_utils import
   SSZ, SszTestsDir, hash_tree_root, loadBlock, parseTest,
   readSszBytes, toSszType
+<<<<<<< HEAD
 from ../teststateutil import checkPerValidatorBalanceCalc
+=======
+>>>>>>> origin/unstable
 
 proc runTest(
     consensusFork: static ConsensusFork,
@@ -54,6 +57,7 @@ proc runTest(
         discard state_transition(
           defaultRuntimeConfig, fhPreState[], blck, cache, info, flags = {},
           noRollback).expect("should apply block")
+<<<<<<< HEAD
         withState(fhPreState[]):
           when consensusFork == ConsensusFork.Deneb:
             if unitTestName != "randomized_14":
@@ -63,6 +67,8 @@ proc runTest(
               # point to a potentially fixable/unexpected test case which is
               # involves code not run outside the test suite to begin with.
               check checkPerValidatorBalanceCalc(forkyState.data)
+=======
+>>>>>>> origin/unstable
       else:
         let res = state_transition(
           defaultRuntimeConfig, fhPreState[], blck, cache, info, flags = {},
@@ -107,11 +113,13 @@ template runForkBlockTests(consensusFork: static ConsensusFork) =
         "EF - " & forkHumanName & " - Finality",
         FinalityDir, suiteName, path)
 
-  suite "EF - " & forkHumanName & " - Random " & preset():
-    for kind, path in walkDir(RandomDir, relative = true, checkDir = true):
-      consensusFork.runTest(
-        "EF - " & forkHumanName & " - Random",
-        RandomDir, suiteName, path)
+  debugGloasComment "random block sanity"
+  when consensusFork != ConsensusFork.Gloas:
+    suite "EF - " & forkHumanName & " - Random " & preset():
+      for kind, path in walkDir(RandomDir, relative = true, checkDir = true):
+        consensusFork.runTest(
+          "EF - " & forkHumanName & " - Random",
+          RandomDir, suiteName, path)
 
 withAll(ConsensusFork):
   runForkBlockTests(consensusFork)

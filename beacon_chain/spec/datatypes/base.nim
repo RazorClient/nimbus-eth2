@@ -5,7 +5,7 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
-{.push raises: [].}
+{.push raises: [], gcsafe.}
 
 # This file contains data types that are part of the spec and thus subject to
 # serialization and spec updates.
@@ -68,13 +68,22 @@ import
   json_serialization,
   ssz_serialization/types as sszTypes,
   ../../version,
-  ".."/[beacon_time, crypto, digest, presets]
+  ../[beacon_time, crypto, digest, presets]
+
+from eth/common/eth_types_json_serialization import readValue, writeValue
+
+from std/algorithm import isSorted
 
 export
   tables, results, endians2, json_serialization, sszTypes, beacon_time, crypto,
-  digest, presets
+  digest, presets, eth, eth_types_json_serialization.readValue,
+  eth_types_json_serialization.writeValue
 
+<<<<<<< HEAD
 const SPEC_VERSION* = "1.5.0-beta.5"
+=======
+const SPEC_VERSION* = "1.6.0-beta.0"
+>>>>>>> origin/unstable
 ## Spec version we're aiming to be compatible with, right now
 
 const
@@ -400,6 +409,7 @@ type
     beacon_proposer_indices*: Table[Slot, Opt[ValidatorIndex]]
     sync_committees*: Table[SyncCommitteePeriod, SyncCommitteeCache]
 
+<<<<<<< HEAD
   # This matches the mutable state of the Solidity deposit contract
   # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.5/solidity_deposit_contract/deposit_contract.sol
   DepositContractState* = object
@@ -417,6 +427,8 @@ type
     execution_block_hash*: Eth2Digest
     execution_block_height*: uint64
 
+=======
+>>>>>>> origin/unstable
   # https://github.com/ethereum/consensus-specs/blob/v1.4.0/specs/phase0/beacon-chain.md#validator
   ValidatorStatus* = object
     # This is a validator without the expensive, immutable, append-only parts
@@ -962,7 +974,11 @@ func checkForkConsistency*(cfg: RuntimeConfig) =
     [cfg.GENESIS_FORK_VERSION, cfg.ALTAIR_FORK_VERSION,
      cfg.BELLATRIX_FORK_VERSION, cfg.CAPELLA_FORK_VERSION,
      cfg.DENEB_FORK_VERSION, cfg.ELECTRA_FORK_VERSION,
+<<<<<<< HEAD
      cfg.FULU_FORK_VERSION]
+=======
+     cfg.FULU_FORK_VERSION, cfg.GLOAS_FORK_VERSION]
+>>>>>>> origin/unstable
 
   for i in 0 ..< forkVersions.len:
     for j in i+1 ..< forkVersions.len:
@@ -982,6 +998,12 @@ func checkForkConsistency*(cfg: RuntimeConfig) =
   assertForkEpochOrder(cfg.CAPELLA_FORK_EPOCH, cfg.DENEB_FORK_EPOCH)
   assertForkEpochOrder(cfg.DENEB_FORK_EPOCH, cfg.ELECTRA_FORK_EPOCH)
   assertForkEpochOrder(cfg.ELECTRA_FORK_EPOCH, cfg.FULU_FORK_EPOCH)
+<<<<<<< HEAD
+=======
+  assertForkEpochOrder(cfg.FULU_FORK_EPOCH, cfg.GLOAS_FORK_EPOCH)
+
+  doAssert isSorted(cfg.BLOB_SCHEDULE, cmp = cmpBlobParameters)
+>>>>>>> origin/unstable
 
 func ofLen*[T, N](ListType: type List[T, N], n: int): ListType =
   if n < N:
@@ -989,5 +1011,10 @@ func ofLen*[T, N](ListType: type List[T, N], n: int): ListType =
   else:
     raise newException(SszSizeMismatchError)
 
+<<<<<<< HEAD
 # Specifically has the `Fulu` naming, for easy debugging.
 template debugFuluComment* (s: string) = discard
+=======
+template debugFuluComment*(s: string) = discard
+template debugGloasComment*(s: string) = discard
+>>>>>>> origin/unstable

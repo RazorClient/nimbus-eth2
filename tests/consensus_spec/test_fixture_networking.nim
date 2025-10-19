@@ -11,9 +11,12 @@
 import
   std/[json, streams],
   yaml,
-  kzg4844/[kzg, kzg_abi],
   stint,
+<<<<<<< HEAD
   eth/p2p/discoveryv5/[node],
+=======
+  eth/p2p/discoveryv5/node,
+>>>>>>> origin/unstable
   ../../beacon_chain/spec/peerdas_helpers,
   ../testutil,
   ./fixtures_utils, ./os_ops
@@ -35,7 +38,12 @@ proc runComputeForCustodyGroup(suiteName, path: string) =
       custody_group = meta.custody_group
 
     var counter = 0
+<<<<<<< HEAD
     for column in compute_columns_for_custody_group(custody_group):
+=======
+    for column in compute_columns_for_custody_group(
+        defaultRuntimeConfig, custody_group):
+>>>>>>> origin/unstable
       check column == meta.result[counter]
       inc counter
 
@@ -56,7 +64,12 @@ proc runGetCustodyGroups(suiteName, path: string) =
       node_id = UInt256.fromDecimal(meta.node_id)
       custody_group_count = meta.custody_group_count
 
+<<<<<<< HEAD
     let columns = get_custody_groups(node_id, custody_group_count)
+=======
+    let columns = defaultRuntimeConfig.get_custody_groups(
+      node_id, custody_group_count)
+>>>>>>> origin/unstable
 
     for i in 0..<columns.lenu64:
       check columns[i] == meta.result[i]

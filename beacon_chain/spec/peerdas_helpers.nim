@@ -1,10 +1,15 @@
 # beacon_chain
+<<<<<<< HEAD
 # Copyright (c) 2018-2025 Status Research & Development GmbH
+=======
+# Copyright (c) 2025 Status Research & Development GmbH
+>>>>>>> origin/unstable
 # Licensed and distributed under either of
 #   * MIT license (license terms in the root directory or at https://opensource.org/licenses/MIT).
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
+<<<<<<< HEAD
 {.push raises: [].}
 
 # Uncategorized helper functions from the spec
@@ -19,11 +24,32 @@ import
   ./crypto,
   ./[helpers, digest],
   ./datatypes/[fulu]
+=======
+{.push raises: [], gcsafe.}
+
+# Uncategorized helper functions from the spec
+import
+  chronos, chronicles, results, taskpools,
+  eth/p2p/discoveryv5/node,
+  kzg4844/kzg,
+  ssz_serialization/[
+    proofs,
+    types],
+  stew/assign2,
+  ./crypto,
+  ./[helpers, digest],
+  ./datatypes/fulu
+
+from std/algorithm import sort
+from std/sequtils import toSeq
+from stew/staticfor import staticFor
+>>>>>>> origin/unstable
 
 type
   CellBytes = array[fulu.CELLS_PER_EXT_BLOB, Cell]
   ProofBytes = array[fulu.CELLS_PER_EXT_BLOB, KzgProof]
 
+<<<<<<< HEAD
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#compute_columns_for_custody_group
 iterator compute_columns_for_custody_group*(custody_group: CustodyIndex):
                                             ColumnIndex =
@@ -34,6 +60,19 @@ func handle_custody_groups(node_id: NodeId,
                            custody_group_count: CustodyIndex):
                            HashSet[CustodyIndex] =
 
+=======
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.4/specs/fulu/das-core.md#compute_columns_for_custody_group
+iterator compute_columns_for_custody_group*(cfg: RuntimeConfig,
+                                            custody_group: CustodyIndex):
+                                            ColumnIndex =
+  let columns_per_group = NUMBER_OF_COLUMNS div cfg.NUMBER_OF_CUSTODY_GROUPS
+  for i in 0'u64 ..< columns_per_group:
+    yield ColumnIndex(cfg.NUMBER_OF_CUSTODY_GROUPS * i + custody_group)
+
+func handle_custody_groups(cfg: RuntimeConfig, node_id: NodeId,
+                           custody_group_count: CustodyIndex):
+                           HashSet[CustodyIndex] =
+>>>>>>> origin/unstable
   # Decouples the custody group computation from
   # `get_custody_groups`, in order to later use this custody
   # group list across various types of output types
@@ -42,7 +81,12 @@ func handle_custody_groups(node_id: NodeId,
     custody_groups: HashSet[CustodyIndex]
     current_id = node_id
 
+<<<<<<< HEAD
   while custody_groups.lenu64 < custody_group_count:
+=======
+  let safe_count = min(custody_group_count, cfg.NUMBER_OF_CUSTODY_GROUPS)
+  while custody_groups.lenu64 < safe_count:
+>>>>>>> origin/unstable
     var hashed_bytes: array[8, byte]
 
     let
@@ -51,7 +95,11 @@ func handle_custody_groups(node_id: NodeId,
 
     hashed_bytes[0..7] = hashed_current_id.data.toOpenArray(0,7)
     let custody_group = bytes_to_uint64(hashed_bytes) mod
+<<<<<<< HEAD
       NUMBER_OF_CUSTODY_GROUPS
+=======
+      cfg.NUMBER_OF_CUSTODY_GROUPS
+>>>>>>> origin/unstable
 
     custody_groups.incl custody_group
 
@@ -60,16 +108,25 @@ func handle_custody_groups(node_id: NodeId,
   custody_groups
 
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#get_custody_groups
+<<<<<<< HEAD
 func get_custody_groups*(node_id: NodeId,
                         custody_group_count: CustodyIndex):
                         seq[CustodyIndex] =
   let custody_groups =
     node_id.handle_custody_groups(custody_group_count)
+=======
+func get_custody_groups*(cfg: RuntimeConfig, node_id: NodeId,
+                         custody_group_count: CustodyIndex):
+                         seq[CustodyIndex] =
+  let custody_groups =
+    cfg.handle_custody_groups(node_id, custody_group_count)
+>>>>>>> origin/unstable
 
   var groups = custody_groups.toSeq()
   groups.sort()
   groups
 
+<<<<<<< HEAD
 func resolve_columns_from_custody_groups*(node_id: NodeId,
                                           custody_group_count: CustodyIndex):
                                           seq[ColumnIndex] =
@@ -89,6 +146,18 @@ func resolve_column_sets_from_custody_groups*(node_id: NodeId,
                                     HashSet[ColumnIndex] =
 
   node_id.resolve_columns_from_custody_groups(custody_group_count).toHashSet()
+=======
+func resolve_columns_from_custody_groups*(cfg: RuntimeConfig, node_id: NodeId,
+                                          custody_group_count: CustodyIndex):
+                                          HashSet[ColumnIndex] =
+  ## Returns a set of unique columns for the custody groups of a node.
+  let custody_groups = cfg.get_custody_groups(node_id, custody_group_count)
+  var columns: HashSet[ColumnIndex]
+  for group in custody_groups:
+    for index in compute_columns_for_custody_group(cfg, group):
+      columns.incl index
+  columns
+>>>>>>> origin/unstable
 
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.4/specs/fulu/das-core.md#compute_matrix
 proc compute_matrix*(blobs: seq[KzgBlob]): Result[seq[MatrixEntry], cstring] =
@@ -111,7 +180,11 @@ proc compute_matrix*(blobs: seq[KzgBlob]): Result[seq[MatrixEntry], cstring] =
 
   ok(extended_matrix)
 
+<<<<<<< HEAD
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#recover_matrix
+=======
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.0/specs/fulu/das-core.md#recover_matrix
+>>>>>>> origin/unstable
 proc recover_matrix*(partial_matrix: seq[MatrixEntry],
                      blobCount: int):
                      Result[seq[MatrixEntry], cstring] =
@@ -146,6 +219,7 @@ proc recover_matrix*(partial_matrix: seq[MatrixEntry],
 
   ok(extended_matrix)
 
+<<<<<<< HEAD
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/das-core.md#get_data_column_sidecars
 proc get_data_column_sidecars*(signed_beacon_block: electra.TrustedSignedBeaconBlock,
                                cellsAndProofs: seq[CellsAndProofs]):
@@ -295,6 +369,154 @@ proc verify_data_column_sidecar_inclusion_proof*(sidecar: DataColumnSidecar):
                                                  Result[void, cstring] =
   ## Verify if the given KZG Commitments are in included
   ## in the beacon block or not
+=======
+proc recoverCellsAndKzgProofsTask(cellIndices: seq[CellIndex],
+                                  cells: seq[Cell]): Result[CellsAndProofs, void] =
+  recoverCellsAndKzgProofs(cellIndices, cells).mapErr(
+    proc (x: string) =
+      discard)
+
+proc recover_cells_and_proofs_parallel*(
+    tp: Taskpool,
+    dataColumns: seq[ref fulu.DataColumnSidecar]):
+    Result[seq[CellsAndProofs], cstring] =
+  ## This helper recovers blobs from the data column sidecars parallelly
+  if dataColumns.len == 0:
+    return err("DataColumnSidecar: Length should not be 0")
+
+  let
+    columnCount = dataColumns.len
+    blobCount = dataColumns[0].column.len
+
+  for column in dataColumns:
+    if not (blobCount == column.column.len):
+      return err("DataColumns do not have the same length")
+
+  var
+    pendingFuts: seq[Flowvar[Result[CellsAndProofs, void]]]
+    res = newSeq[CellsAndProofs](blobCount)
+
+  let startTime = Moment.now()
+  const reconstructionTimeout = 2.seconds
+
+  # ---- Spawn phase with time limit ----
+  for blobIdx in 0 ..< blobCount:
+    let now = Moment.now()
+    if (now - startTime) > reconstructionTimeout:
+      debug "PeerDAS reconstruction timed out while preparing columns",
+        spawned = pendingFuts.len, total = blobCount
+      break  # Stop spawning new tasks
+
+    var
+      cellIndices = newSeq[CellIndex](columnCount)
+      cells = newSeq[Cell](columnCount)
+    for i in 0 ..< dataColumns.len:
+      cellIndices[i] = dataColumns[i][].index
+      cells[i] = dataColumns[i][].column[blobIdx]
+    pendingFuts.add(tp.spawn recoverCellsAndKzgProofsTask(cellIndices, cells))
+
+  # ---- Sync phase ----
+  for i in 0 ..< pendingFuts.len:
+    let now = Moment.now()
+    if (now - startTime) > reconstructionTimeout:
+      debug "PeerDAS reconstruction timed out",
+        completed = i, totalSpawned = pendingFuts.len
+      return err("Data column reconstruction timed out")
+
+    let futRes = sync pendingFuts[i]
+    if futRes.isErr:
+      return err("KZG cells and proofs recovery failed")
+
+    res[i] = futRes.get
+
+  if pendingFuts.len < blobCount:
+    return err("Data column reconstruction timed out")
+
+  ok(res)
+
+
+proc assemble_data_column_sidecars*(
+    signed_beacon_block: fulu.SignedBeaconBlock | gloas.SignedBeaconBlock,
+    blobs: seq[KzgBlob], cell_proofs: seq[KzgProof]): seq[fulu.DataColumnSidecar] =
+  template blck(): auto = signed_beacon_block.message
+  var sidecars = newSeqOfCap[fulu.DataColumnSidecar](CELLS_PER_EXT_BLOB)
+
+  when signed_beacon_block is gloas.SignedBeaconBlock:
+    debugGloasComment "kzg_commitments removed from beaconblock in gloas"
+    return sidecars
+  else:
+    template kzg_commitments: untyped =
+      signed_beacon_block.message.body.blob_kzg_commitments
+    if kzg_commitments.len == 0:
+      return sidecars
+    let
+      beacon_block_header =
+        BeaconBlockHeader(
+          slot: blck.slot,
+          proposer_index: blck.proposer_index,
+          parent_root: blck.parent_root,
+          state_root: blck.state_root,
+          body_root: hash_tree_root(blck.body))
+
+      signed_beacon_block_header =
+        SignedBeaconBlockHeader(
+          message: beacon_block_header,
+          signature: signed_beacon_block.signature)
+
+    var
+      cells = newSeq[CellBytes](blobs.len)
+      proofs = newSeq[ProofBytes](blobs.len)
+
+    for i in 0 ..< blobs.len:
+      cells[i] = computeCells(blobs[i]).get
+      let proofElem = addr proofs[i]
+      staticFor j, 0 ..< CELLS_PER_EXT_BLOB:
+        assign(proofElem[][j], cell_proofs[i * CELLS_PER_EXT_BLOB + j])
+
+    for columnIndex in 0..<CELLS_PER_EXT_BLOB:
+      var
+        column = newSeqOfCap[KzgCell](blobs.len)
+        kzgProofOfColumn = newSeqOfCap[KzgProof](blobs.len)
+      for rowIndex in 0..<blobs.len:
+        column.add(cells[rowIndex][columnIndex])
+        kzgProofOfColumn.add(proofs[rowIndex][columnIndex])
+
+      var sidecar = fulu.DataColumnSidecar(
+        index: ColumnIndex(columnIndex),
+        column: DataColumn.init(column),
+        kzg_commitments: blck.body.blob_kzg_commitments,
+        kzg_proofs: deneb.KzgProofs.init(kzgProofOfColumn),
+        signed_block_header: signed_beacon_block_header)
+      blck.body.build_proof(
+        KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH_GINDEX.GeneralizedIndex,
+        sidecar.kzg_commitments_inclusion_proof).expect("Valid gindex")
+      sidecars.add(sidecar)
+
+    sidecars
+
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.3/specs/fulu/p2p-interface.md#verify_data_column_sidecar
+func verify_data_column_sidecar*(sidecar: fulu.DataColumnSidecar |
+                                          gloas.DataColumnSidecar):
+                                 Result[void, cstring] =
+  ## Verify if the data column sidecar is valid.
+
+  if sidecar.index >= NUMBER_OF_COLUMNS:
+    return err("Data column sidecar index exceeds the NUMBER_OF_COLUMNS")
+
+  if sidecar.kzg_commitments.len == 0:
+    return err("Data column contains zero blob")
+
+  if sidecar.column.len != sidecar.kzg_commitments.len or
+      sidecar.column.len != sidecar.kzg_proofs.len:
+    return err("Data column length must be equal to the number of commitments/proofs")
+
+  ok()
+
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.3/specs/fulu/p2p-interface.md#verify_data_column_sidecar_inclusion_proof
+func verify_data_column_sidecar_inclusion_proof*(sidecar: fulu.DataColumnSidecar):
+                                                 Result[void, cstring] =
+  ## Verify if the given KZG commitments included in the given beacon block.
+>>>>>>> origin/unstable
   let gindex =
     KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH_GINDEX.GeneralizedIndex
   if not is_valid_merkle_branch(
@@ -308,6 +530,7 @@ proc verify_data_column_sidecar_inclusion_proof*(sidecar: DataColumnSidecar):
 
   ok()
 
+<<<<<<< HEAD
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-alpha.10/specs/fulu/p2p-interface.md#verify_data_column_sidecar_kzg_proofs
 proc verify_data_column_sidecar_kzg_proofs*(sidecar: DataColumnSidecar):
                                             Result[void, cstring] =
@@ -339,10 +562,30 @@ proc verify_data_column_sidecar_kzg_proofs*(sidecar: DataColumnSidecar):
                             sidecar.kzg_proofs.asSeq)
 
   if res.isErr():
+=======
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.3/specs/fulu/p2p-interface.md#verify_data_column_sidecar_kzg_proofs
+proc verify_data_column_sidecar_kzg_proofs*(sidecar: fulu.DataColumnSidecar |
+                                                     gloas.DataColumnSidecar):
+                                            Result[void, cstring] =
+  ## Verify if the KZG proofs are correct.
+
+  # Iterate through the cell indices
+  var cellIndices = newSeqOfCap[CellIndex](sidecar.column.len)
+  for _ in 0..<sidecar.column.len:
+    cellIndices.add(CellIndex(sidecar.index))
+
+  let res = verifyCellKzgProofBatch(
+      sidecar.kzg_commitments.asSeq, cellIndices, sidecar.column.asSeq,
+      sidecar.kzg_proofs.asSeq).valueOr:
+    return err("DataColumnSidecar: validation error")
+
+  if not res:
+>>>>>>> origin/unstable
     return err("DataColumnSidecar: validation failed")
 
   ok()
 
+<<<<<<< HEAD
 # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.3/specs/fulu/das-core.md#validator-custody
 func get_validators_custody_requirement*(state: fulu.BeaconState,
                                          validator_indices: openArray[ValidatorIndex]):
@@ -352,3 +595,12 @@ func get_validators_custody_requirement*(state: fulu.BeaconState,
     total_node_balance += state.balances[index]
   let count = total_node_balance div BALANCE_PER_ADDITIONAL_CUSTODY_GROUP
   min(max(count.uint64, VALIDATOR_CUSTODY_REQUIREMENT.uint64), NUMBER_OF_CUSTODY_GROUPS.uint64)
+=======
+# https://github.com/ethereum/consensus-specs/blob/v1.6.0-alpha.4/specs/fulu/validator.md#validator-custody
+func get_validators_custody_requirement*(cfg: RuntimeConfig,
+                                         total_node_balance: Gwei):
+                                         uint64 =
+  let count = total_node_balance div cfg.BALANCE_PER_ADDITIONAL_CUSTODY_GROUP
+  min(max(count.uint64, cfg.VALIDATOR_CUSTODY_REQUIREMENT),
+      cfg.NUMBER_OF_CUSTODY_GROUPS.uint64)
+>>>>>>> origin/unstable

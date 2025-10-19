@@ -36,7 +36,11 @@ proc setupEngineAPI*(server: RpcServer) =
     )
 
   # https://github.com/ethereum/execution-apis/blob/v1.0.0-beta.4/src/engine/paris.md#engine_getpayloadv1
+<<<<<<< HEAD
   server.rpc("engine_getPayloadV1") do(payloadId: PayloadID) -> ExecutionPayloadV1:
+=======
+  server.rpc("engine_getPayloadV1") do(payloadId: Bytes8) -> ExecutionPayloadV1:
+>>>>>>> origin/unstable
     info "engine_getPayloadV1",
       id = payloadId.toHex
 

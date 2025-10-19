@@ -19,6 +19,10 @@ import
   ./deneb/all_deneb_fixtures,
   ./electra/all_electra_fixtures,
   ./fulu/all_fulu_fixtures,
+<<<<<<< HEAD
+=======
+  ./gloas/all_gloas_fixtures,
+>>>>>>> origin/unstable
   ./test_fixture_fork,
   ./test_fixture_fork_choice,
   ./test_fixture_light_client_data_collection,

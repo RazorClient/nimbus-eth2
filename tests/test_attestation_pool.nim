@@ -5,7 +5,7 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
-{.push raises: [].}
+{.push raises: [], gcsafe.}
 {.used.}
 
 import
@@ -15,7 +15,11 @@ import
   # Internal
   ../beacon_chain/consensus_object_pools/[
     blockchain_dag, block_clearance, attestation_pool],
+<<<<<<< HEAD
   ../beacon_chain/spec/[state_transition, validator],
+=======
+  ../beacon_chain/spec/state_transition,
+>>>>>>> origin/unstable
   ../beacon_chain/beacon_clock,
   # Test utilities
   ./testutil, ./testdbutil, ./testblockutil, ./consensus_spec/fixtures_utils
@@ -27,10 +31,14 @@ from ../beacon_chain/consensus_object_pools/block_quarantine import
 from ../beacon_chain/spec/beaconstate import
   attester_dependent_root, check_attestation, get_attesting_indices,
   latest_block_root
+<<<<<<< HEAD
+=======
+from ../beacon_chain/spec/validator import
+  get_beacon_committee, get_committee_count_per_slot, get_committee_indices
+>>>>>>> origin/unstable
 from ./testbcutil import addHeadBlock
 
-func combine(tgt: var (phase0.Attestation | electra.Attestation),
-  src: phase0.Attestation | electra.Attestation) =
+func combine(tgt: var electra.Attestation, src: electra.Attestation) =
   ## Combine the signature and participation bitfield, with the assumption that
   ## the same data is being signed - if the signatures overlap, they are not
   ## combined.
@@ -49,8 +57,6 @@ func combine(tgt: var (phase0.Attestation | electra.Attestation),
   agg.aggregate(src.signature.load.get())
   tgt.signature = agg.finish().toValidatorSig()
 
-func loadSig(a: phase0.Attestation): CookedSig =
-  a.signature.load.get()
 func loadSig(a: electra.Attestation): CookedSig =
   a.signature.load.get()
 
@@ -65,21 +71,38 @@ proc pruneAtFinalization(dag: ChainDAGRef, attPool: AttestationPool) =
 template addAttestation(a, b, c, d, e, f: untyped): untyped =
   addAttestation(a, b, c, d, -1, e, f)
 
+<<<<<<< HEAD
 suite "Attestation pool processing" & preset():
+=======
+proc getElectraAttestationsForBlock(
+    pool: var AttestationPool, state: ForkedHashedBeaconState,
+    cache: var StateCache): seq[electra.Attestation] =
+  withState(state):
+    when consensusFork >= ConsensusFork.Electra:
+      pool.getAttestationsForBlock(forkyState, cache)
+    else:
+      raiseAssert "invalid fork"
+
+suite "Attestation pool electra processing" & preset():
+>>>>>>> origin/unstable
   ## For now just test that we can compile and execute block processing with
   ## mock data.
 
   setup:
-    # Genesis state that results in 6 members per committee
+    # Genesis state that results in 6 members per committee (2 committees total)
     let rng = HmacDrbgContext.new()
+    const TOTAL_COMMITTEES = 2
     var
-      validatorMonitor = newClone(ValidatorMonitor.init())
+      cfg = genesisTestRuntimeConfig(ConsensusFork.Electra)
+      validatorMonitor = newClone(ValidatorMonitor.init(cfg.time))
       dag = init(
-        ChainDAGRef, defaultRuntimeConfig, makeTestDB(SLOTS_PER_EPOCH * 6),
+        ChainDAGRef, cfg,
+        cfg.makeTestDB(
+          TOTAL_COMMITTEES * TARGET_COMMITTEE_SIZE * SLOTS_PER_EPOCH),
         validatorMonitor, {})
       taskpool = Taskpool.new()
-      verifier = BatchVerifier.init(rng, taskpool)
-      quarantine = newClone(Quarantine.init())
+      verifier {.used.} = BatchVerifier.init(rng, taskpool)
+      quarantine = newClone(Quarantine.init(dag.cfg))
       pool = newClone(AttestationPool.init(dag, quarantine))
       state = newClone(dag.headState)
       cache = StateCache()
@@ -87,7 +110,11 @@ suite "Attestation pool processing" & preset():
     # Slot 0 is a finalized slot - won't be making attestations for it..
     check:
       process_slots(
-        dag.cfg, state[], getStateField(state[], slot) + 1, cache, info,
+        dag.cfg,
+        state[],
+        getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+        cache,
+        info,
         {}).isOk()
 
   test "Attestation from different branch" & preset():
@@ -110,7 +137,7 @@ suite "Attestation pool processing" & preset():
           blck = addTestBlock(
             state[], cache, attestations = attestations, cfg = dag.cfg)
         check dag.addHeadBlock(
-          verifier, blck.phase0Data, OnPhase0BlockAdded(nil)).isOk
+          verifier, blck.electraData, OnBlockAdded[ConsensusFork.Electra](nil)).isOk
 
     # History 1 contains all odd blocks
     state.fillToEpoch(cache)
@@ -136,13 +163,13 @@ suite "Attestation pool processing" & preset():
           slot = getStateField(state[], slot)
           parent_root = withState(state[]): forkyState.latest_block_root
           committee = get_beacon_committee(state[], slot, cIndex, cache)
-        makeAttestation(state[], parent_root, committee[0], cache)
+        makeElectraAttestation(state[], parent_root, committee[0], cache)
       att2 = block:
         let
           slot = getStateField(state2[], slot)
           parent_root = withState(state2[]): forkyState.latest_block_root
           committee = get_beacon_committee(state2[], slot, cIndex, cache2)
-        makeAttestation(state2[], parent_root, committee[0], cache2)
+        makeElectraAttestation(state2[], parent_root, committee[0], cache2)
       maxSlot = max(att1.data.slot, att2.data.slot)
 
     # Advance time so attestations become valid
@@ -156,24 +183,28 @@ suite "Attestation pool processing" & preset():
 
     # They should remain valid only within a compatible state
     withState(state[]):
-      check:
-        check_attestation(forkyState.data, att1, {}, cache).isOk
-        check_attestation(forkyState.data, att2, {}, cache).isErr
+      when consensusFork >= ConsensusFork.Electra:
+        check:
+          check_attestation(forkyState.data, att1, {}, cache, true).isOk
+          check_attestation(forkyState.data, att2, {}, cache, true).isErr
     withState(state2[]):
-      check:
-        check_attestation(forkyState.data, att1, {}, cache2).isErr
-        check_attestation(forkyState.data, att2, {}, cache2).isOk
+      when consensusFork >= ConsensusFork.Electra:
+        check:
+          check_attestation(forkyState.data, att1, {}, cache2, true).isErr
+          check_attestation(forkyState.data, att2, {}, cache2, true).isOk
 
     # If signature checks are skipped, state incompatibility is not detected
-    let flags = {skipBlsValidation}
+    const flags = {skipBlsValidation}
     withState(state[]):
-      check:
-        check_attestation(forkyState.data, att1, flags, cache).isOk
-        check_attestation(forkyState.data, att2, flags, cache).isOk
+      when consensusFork >= ConsensusFork.Electra:
+        check:
+          check_attestation(forkyState.data, att1, flags, cache, true).isOk
+          check_attestation(forkyState.data, att2, flags, cache, true).isOk
     withState(state2[]):
-      check:
-        check_attestation(forkyState.data, att1, flags, cache2).isOk
-        check_attestation(forkyState.data, att2, flags, cache2).isOk
+      when consensusFork >= ConsensusFork.Electra:
+        check:
+          check_attestation(forkyState.data, att1, flags, cache2, true).isOk
+          check_attestation(forkyState.data, att2, flags, cache2, true).isOk
 
     # An additional compatibility check catches that (used in block production)
     withState(state[]):
@@ -185,6 +216,7 @@ suite "Attestation pool processing" & preset():
         check_attestation_compatible(dag, forkyState, att1).isErr
         check_attestation_compatible(dag, forkyState, att2).isOk
 
+<<<<<<< HEAD
   test "Can add and retrieve simple attestations" & preset():
     let
       # Create an attestation for slot 1!
@@ -785,6 +817,8 @@ suite "Attestation pool electra processing" & preset():
         info,
         {}).isOk()
 
+=======
+>>>>>>> origin/unstable
   test "Can add and retrieve simple electra attestations" & preset():
     let
       # Create an attestation for slot 1!
@@ -797,11 +831,9 @@ suite "Attestation pool electra processing" & preset():
       attestation, @[bc0[0]], attestation.aggregation_bits.len,
       attestation.loadSig, attestation.data.slot.start_beacon_time)
 
-    check:
-      process_slots(
-        defaultRuntimeConfig, state[],
-        getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY, cache,
-        info, {}).isOk()
+    check cfg.process_slots(
+      state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+      cache, info, {}).isOk()
 
     let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
 
@@ -819,10 +851,9 @@ suite "Attestation pool electra processing" & preset():
     check:
       withState(state[]): forkyState.latest_block_root == root1
 
-      process_slots(
-        defaultRuntimeConfig, state[],
-        getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY, cache,
-        info, {}).isOk()
+      cfg.process_slots(
+        state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+        cache, info, {}).isOk()
 
       withState(state[]): forkyState.latest_block_root == root1
 
@@ -904,11 +935,9 @@ suite "Attestation pool electra processing" & preset():
       attestation_2, @[bc0[1]], attestation_2.aggregation_bits.len,
       attestation_2.loadSig, attestation_2.data.slot.start_beacon_time)
 
-    check:
-      process_slots(
-        defaultRuntimeConfig, state[],
-        getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY, cache,
-        info, {}).isOk()
+    check cfg.process_slots(
+      state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+      cache, info, {}).isOk()
 
     let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
 
@@ -972,11 +1001,9 @@ suite "Attestation pool electra processing" & preset():
       attestation_3, @[bc1[1]], attestation_3.aggregation_bits.len,
       attestation_3.loadSig, attestation_3.data.slot.start_beacon_time)
 
-    check:
-      process_slots(
-        defaultRuntimeConfig, state[],
-        getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY, cache,
-        info, {}).isOk()
+    check cfg.process_slots(
+      state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+      cache, info, {}).isOk()
 
     let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
 
@@ -990,6 +1017,392 @@ suite "Attestation pool electra processing" & preset():
       attestations.len == 1
       attestations[0].aggregation_bits.countOnes() == 3
       attestations[0].committee_bits.countOnes() == 2
+
+  test "Everyone voting for something different" & preset():
+    var attestations: int
+    for i in 0..<SLOTS_PER_EPOCH:
+      var root: Eth2Digest
+      root.data[0..<8] = toBytesBE(i.uint64)
+      let bc0 = get_beacon_committee(
+        state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
+
+      for j in 0..<bc0.len():
+        root.data[8..<16] = toBytesBE(j.uint64)
+        let att = makeElectraAttestation(state[], root, bc0[j], cache)
+        pool[].addAttestation(
+          att, @[bc0[j]], att.aggregation_bits.len, att.loadSig,
+          att.data.slot.start_beacon_time)
+        inc attestations
+
+      check cfg.process_slots(
+        state[], getStateField(state[], slot) + 1, cache, info, {}).isOk()
+
+    doAssert attestations.uint64 > MAX_ATTESTATIONS_ELECTRA,
+      "6*SLOTS_PER_EPOCH validators > 8 mainnet MAX_ATTESTATIONS_ELECTRA"
+    check:
+      # Fill block with attestations
+      pool[].getElectraAttestationsForBlock(state[], cache).lenu64() ==
+        MAX_ATTESTATIONS_ELECTRA
+      pool[].getElectraAggregatedAttestation(
+        getStateField(state[], slot) - 1, 0.CommitteeIndex).isSome()
+
+  test "Attestations may arrive in any order" & preset():
+    var cache = StateCache()
+    let
+      # Create an attestation for slot 1!
+      bc0 = get_beacon_committee(
+        state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
+      attestation0 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[0], cache)
+
+    check cfg.process_slots(
+      state[], getStateField(state[], slot) + 1, cache, info, {}).isOk()
+
+    let
+      bc1 = get_beacon_committee(state[],
+        getStateField(state[], slot), 0.CommitteeIndex, cache)
+      attestation1 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc1[0], cache)
+
+    # test reverse order
+    pool[].addAttestation(
+      attestation1, @[bc1[0]], attestation1.aggregation_bits.len,
+      attestation1.loadSig, attestation1.data.slot.start_beacon_time)
+    pool[].addAttestation(
+      attestation0, @[bc0[0]], attestation0.aggregation_bits.len,
+      attestation0.loadSig, attestation0.data.slot.start_beacon_time)
+
+    let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
+
+    check:
+      attestations.len == 1
+
+  test "Attestations should be combined" & preset():
+    var cache = StateCache()
+    let
+      # Create an attestation for slot 1!
+      bc0 = get_beacon_committee(
+        state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
+      attestation0 =
+        makeElectraAttestation(state[], state[].latest_block_root, bc0[0], cache)
+      attestation1 =
+        makeElectraAttestation(state[], state[].latest_block_root, bc0[1], cache)
+
+    pool[].addAttestation(
+      attestation0, @[bc0[0]], attestation0.aggregation_bits.len,
+      attestation0.loadSig, attestation0.data.slot.start_beacon_time)
+    pool[].addAttestation(
+      attestation1, @[bc0[1]], attestation1.aggregation_bits.len,
+      attestation1.loadSig, attestation1.data.slot.start_beacon_time)
+
+    check cfg.process_slots(
+      state[], MIN_ATTESTATION_INCLUSION_DELAY.Slot + 1,
+      cache, info, {}).isOk()
+
+    let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
+
+    check:
+      attestations.len == 1
+
+  test "Attestations may overlap, bigger first" & preset():
+    var cache = StateCache()
+
+    var
+      # Create an attestation for slot 1!
+      bc0 = get_beacon_committee(
+        state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
+      attestation0 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[0], cache)
+      attestation1 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[1], cache)
+
+    attestation0.combine(attestation1)
+
+    pool[].addAttestation(
+      attestation0, @[bc0[0]], attestation0.aggregation_bits.len,
+      attestation0.loadSig, attestation0.data.slot.start_beacon_time)
+    pool[].addAttestation(
+      attestation1, @[bc0[1]], attestation1.aggregation_bits.len,
+      attestation1.loadSig, attestation1.data.slot.start_beacon_time)
+
+    check cfg.process_slots(
+      state[], MIN_ATTESTATION_INCLUSION_DELAY.Slot + 1,
+      cache, info, {}).isOk()
+
+    let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
+
+    check:
+      attestations.len == 1
+
+  test "Attestations may overlap, smaller first" & preset():
+    var cache = StateCache()
+    var
+      # Create an attestation for slot 1!
+      bc0 = get_beacon_committee(state[],
+        getStateField(state[], slot), 0.CommitteeIndex, cache)
+      attestation0 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[0], cache)
+      attestation1 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[1], cache)
+
+    attestation0.combine(attestation1)
+
+    pool[].addAttestation(
+      attestation1, @[bc0[1]], attestation1.aggregation_bits.len,
+      attestation1.loadSig, attestation1.data.slot.start_beacon_time)
+    pool[].addAttestation(
+      attestation0, @[bc0[0]], attestation0.aggregation_bits.len,
+      attestation0.loadSig, attestation0.data.slot.start_beacon_time)
+
+    check cfg.process_slots(
+      state[], MIN_ATTESTATION_INCLUSION_DELAY.Slot + 1,
+      cache, info, {}).isOk()
+
+    let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
+
+    check:
+      attestations.len == 1
+
+  test "Fork choice returns latest block with no attestations":
+    var cache = StateCache()
+    let
+      b1 = addTestBlock(state[], cache).electraData
+      b1Add = dag.addHeadBlock(verifier, b1) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    let head =
+      pool[].selectOptimisticHead(b1Add[].slot.start_beacon_time).get().blck
+    check:
+      head == b1Add[]
+
+    let
+      b2 = addTestBlock(state[], cache).electraData
+      b2Add = dag.addHeadBlock(verifier, b2) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    let head2 =
+      pool[].selectOptimisticHead(b2Add[].slot.start_beacon_time).get().blck
+
+    check:
+      head2 == b2Add[]
+
+  test "Fork choice returns block with attestation":
+    var cache = StateCache()
+    let
+      b10 = makeTestBlock(state[], cache).electraData
+      b10Add = dag.addHeadBlock(verifier, b10) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    let head =
+      pool[].selectOptimisticHead(b10Add[].slot.start_beacon_time).get().blck
+
+    check:
+      head == b10Add[]
+
+    # Add a block too late to be timely enough to be proposer-boosted, which
+    # would otherwise cause it to be selected as head
+    let
+      b11 = makeTestBlock(state[], cache,
+        graffiti = GraffitiBytes [1'u8, 0, 0, 0 ,0 ,0 ,0 ,0 ,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      ).electraData
+      b11Add = dag.addHeadBlock(verifier, b11) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time + SECONDS_PER_SLOT.int64.seconds)
+
+      bc1 = get_beacon_committee(
+        state[], getStateField(state[], slot) - 1, 1.CommitteeIndex,
+        cache)
+      attestation0 = makeElectraAttestation(state[], b10.root, bc1[0], cache)
+
+    pool[].addAttestation(
+      attestation0, @[bc1[0]], attestation0.aggregation_bits.len,
+      attestation0.loadSig, attestation0.data.slot.start_beacon_time)
+
+    let head2 =
+      pool[].selectOptimisticHead(b10Add[].slot.start_beacon_time).get().blck
+
+    check:
+      # Single vote for b10 and no votes for b11
+      head2 == b10Add[]
+
+    let
+      attestation1 = makeElectraAttestation(state[], b11.root, bc1[1], cache)
+      attestation2 = makeElectraAttestation(state[], b11.root, bc1[2], cache)
+    pool[].addAttestation(
+      attestation1, @[bc1[1]], attestation1.aggregation_bits.len,
+      attestation1.loadSig, attestation1.data.slot.start_beacon_time)
+
+    let head3 =
+      pool[].selectOptimisticHead(b10Add[].slot.start_beacon_time).get().blck
+    let bigger = if b11.root.data < b10.root.data: b10Add else: b11Add
+
+    check:
+      # Ties broken lexicographically in spec -> ?
+      head3 == bigger[]
+
+    pool[].addAttestation(
+      attestation2, @[bc1[2]], attestation2.aggregation_bits.len,
+      attestation2.loadSig, attestation2.data.slot.start_beacon_time)
+
+    let head4 =
+      pool[].selectOptimisticHead(b11Add[].slot.start_beacon_time).get().blck
+
+    check:
+      # Two votes for b11
+      head4 == b11Add[]
+
+  test "Trying to add a block twice tags the second as an error":
+    var cache = StateCache()
+    let
+      b10 = makeTestBlock(state[], cache).electraData
+      b10Add = dag.addHeadBlock(verifier, b10) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    let head =
+      pool[].selectOptimisticHead(b10Add[].slot.start_beacon_time).get().blck
+
+    check:
+      head == b10Add[]
+
+    # -------------------------------------------------------------
+    # Add back the old block to ensure we have a duplicate error
+    let b10_clone = b10 # Assumes deep copy
+    let b10Add_clone = dag.addHeadBlock(verifier, b10_clone) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    doAssert: b10Add_clone.error == VerifierError.Duplicate
+
+  test "Trying to add a duplicate block from an old pruned epoch is tagged as an error":
+    # Note: very sensitive to stack usage
+
+    dag.updateFlags.incl {skipBlsValidation}
+    var cache = StateCache()
+    let
+      b10 = addTestBlock(state[], cache).electraData
+      b10Add = dag.addHeadBlock(verifier, b10) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    let head =
+      pool[].selectOptimisticHead(b10Add[].slot.start_beacon_time).get().blck
+
+    doAssert: head == b10Add[]
+
+    # -------------------------------------------------------------
+    let b10_clone = b10 # Assumes deep copy
+
+    # -------------------------------------------------------------
+    # Pass an epoch
+    var attestations: seq[electra.Attestation]
+
+    for epoch in 0 ..< 5:
+      let start_slot = start_slot(Epoch epoch)
+      let committees_per_slot =
+        get_committee_count_per_slot(state[], Epoch epoch, cache)
+      for slot in start_slot ..< start_slot + SLOTS_PER_EPOCH:
+        let new_block = addTestBlock(
+          state[], cache, electraAttestations = attestations).electraData
+
+        let blockRef = dag.addHeadBlock(verifier, new_block) do (
+            blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+            state: electra.BeaconState,
+            epochRef: EpochRef, unrealized: FinalityCheckpoints):
+          # Callback add to fork choice if valid
+          pool[].addForkChoice(
+            epochRef, blckRef, unrealized, signedBlock.message,
+            blckRef.slot.start_beacon_time)
+
+        let head =
+          pool[].selectOptimisticHead(
+            blockRef[].slot.start_beacon_time).get().blck
+        doAssert: head == blockRef[]
+        dag.updateHead(head, quarantine[], [])
+        pruneAtFinalization(dag, pool[])
+
+        attestations.setLen(0)
+        for committee_index in get_committee_indices(committees_per_slot):
+          let committee = get_beacon_committee(
+            state[], getStateField(state[], slot), committee_index,
+            cache)
+
+          # Create a bitfield filled with the given count per attestation,
+          # exactly on the right-most part of the committee field.
+          var aggregation_bits = init(ElectraCommitteeValidatorsBits, committee.len)
+          for v in 0 ..< committee.len * 2 div 3 + 1:
+            aggregation_bits[v] = true
+
+          var committee_bits: AttestationCommitteeBits
+          committee_bits[committee_index.int] = true
+
+          attestations.add electra.Attestation(
+            committee_bits: committee_bits,
+            aggregation_bits: aggregation_bits,
+            data: makeAttestationData(state[], getStateField(state[], slot),
+              0.CommitteeIndex, blockRef.get().root)
+            # signature: ValidatorSig()
+          )
+
+      cache = StateCache()
+
+    # -------------------------------------------------------------
+    # Prune
+
+    doAssert: dag.finalizedHead.slot != 0
+
+    pool[].prune()
+    doAssert: b10.root notin pool.forkChoice.backend
+
+    # Add back the old block to ensure we have a duplicate error
+    let b10Add_clone = dag.addHeadBlock(verifier, b10_clone) do (
+          blckRef: BlockRef, signedBlock: electra.TrustedSignedBeaconBlock,
+          state: electra.BeaconState,
+          epochRef: EpochRef, unrealized: FinalityCheckpoints):
+        # Callback add to fork choice if valid
+        pool[].addForkChoice(
+          epochRef, blckRef, unrealized, signedBlock.message,
+          blckRef.slot.start_beacon_time)
+
+    doAssert: b10Add_clone.error == VerifierError.Duplicate
 
   test "Working with electra aggregates" & preset():
     let
@@ -1056,10 +1469,16 @@ suite "Attestation pool electra processing" & preset():
       pool[].covers(att1.data, att1.aggregation_bits, att1.committee_bits)
       pool[].covers(att2.data, att2.aggregation_bits, att2.committee_bits)
 
+<<<<<<< HEAD
       process_slots(
         defaultRuntimeConfig, state[],
         getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY, cache,
         info, {}).isOk()
+=======
+      cfg.process_slots(
+        state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+        cache, info, {}).isOk()
+>>>>>>> origin/unstable
 
     for att in pool[].electraAttestations(Opt.none Slot, Opt.none CommitteeIndex):
       check: verifyAttestationSignature(att)
@@ -1167,10 +1586,16 @@ suite "Attestation pool electra processing" & preset():
       if att.data.slot > maxSlot:
         maxSlot = att.data.slot
 
+<<<<<<< HEAD
     check process_slots(
       defaultRuntimeConfig, state[],
       maxSlot + MIN_ATTESTATION_INCLUSION_DELAY, cache,
       info, {}).isOk()
+=======
+    check cfg.process_slots(
+      state[], maxSlot + MIN_ATTESTATION_INCLUSION_DELAY,
+      cache, info, {}).isOk()
+>>>>>>> origin/unstable
 
     let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
     check:
@@ -1187,6 +1612,7 @@ suite "Attestation pool electra processing" & preset():
       pool[].verifyAttestationSignature(state, cache, attestations[1])
 
   test "Simple add and get with electra nonzero committee" & preset():
+<<<<<<< HEAD
      let
        bc0 = get_beacon_committee(
          state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
@@ -1273,3 +1699,88 @@ suite "Attestation pool electra processing" & preset():
           state[].electraData.data, attestations[1], {}, cache, true).isOk
         pool[].verifyAttestationSignature(state, cache, attestations[0])
         pool[].verifyAttestationSignature(state, cache, attestations[1])
+=======
+    let
+      bc0 = get_beacon_committee(
+        state[], getStateField(state[], slot), 0.CommitteeIndex, cache)
+
+      bc1 = get_beacon_committee(
+        state[], getStateField(state[], slot), 1.CommitteeIndex, cache)
+
+      attestation_1 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc0[0], cache)
+
+      attestation_2 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc1[0], cache)
+
+    pool[].addAttestation(
+      attestation_1, @[bc0[0]], attestation_1.aggregation_bits.len,
+      attestation_1.loadSig, attestation_1.data.slot.start_beacon_time)
+
+    pool[].addAttestation(
+      attestation_2, @[bc1[0]], attestation_2.aggregation_bits.len,
+      attestation_2.loadSig, attestation_2.data.slot.start_beacon_time)
+
+    check:
+      cfg.process_slots(
+        state[], getStateField(state[], slot) + MIN_ATTESTATION_INCLUSION_DELAY,
+        cache, info, {}).isOk()
+
+      pool[].getElectraAggregatedAttestation(1.Slot, hash_tree_root(attestation_1.data),
+          0.CommitteeIndex).isOk
+      pool[].getElectraAggregatedAttestation(1.Slot, hash_tree_root(attestation_2.data),
+          1.CommitteeIndex).isOk
+
+  test "Cache coherence on chain aggregates" & preset():
+    # Add attestation from different committee
+    var maxSlot = 0.Slot
+
+    for i in 0 ..< 4:
+      let
+        bc = get_beacon_committee(
+          state[], getStateField(state[], slot), i.CommitteeIndex, cache)
+        att = makeElectraAttestation(
+          state[], state[].latest_block_root, bc[0], cache)
+      var att2 = makeElectraAttestation(
+        state[], state[].latest_block_root, bc[1], cache)
+
+      pool[].addAttestation(
+        att, @[bc[0]], att.aggregation_bits.len, att.loadSig,
+        att.data.slot.start_beacon_time)
+
+      if att.data.slot < 2:
+        pool[].addAttestation(
+          att2, @[bc[1]], att2.aggregation_bits.len, att2.loadSig,
+          att2.data.slot.start_beacon_time)
+
+      if att.data.slot > maxSlot:
+        maxSlot = att.data.slot
+
+    check cfg.process_slots(
+      state[], maxSlot + MIN_ATTESTATION_INCLUSION_DELAY,
+      cache, info, {}).isOk()
+
+    let attestations = pool[].getElectraAttestationsForBlock(state[], cache)
+    check:
+      ## Considering that all structures in getElectraAttestationsForBlock
+      ## are sorted, the most relevant should be at sequence head.
+      ## Given the attestations added, the most "scored" is on
+      ## slot 1
+      attestations.len() == 2
+
+      attestations[0].aggregation_bits.countOnes() == 4
+      attestations[0].committee_bits.countOnes() == 2
+      attestations[0].data.slot == 1.Slot
+
+
+      attestations[1].aggregation_bits.countOnes() == 2
+      attestations[1].committee_bits.countOnes() == 2
+      attestations[1].data.slot == 2.Slot
+
+      check_attestation(
+        state[].electraData.data, attestations[0], {}, cache, true).isOk
+      check_attestation(
+        state[].electraData.data, attestations[1], {}, cache, true).isOk
+      pool[].verifyAttestationSignature(state, cache, attestations[0])
+      pool[].verifyAttestationSignature(state, cache, attestations[1])
+>>>>>>> origin/unstable

@@ -5,7 +5,11 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
+<<<<<<< HEAD
 {.push raises: [].}
+=======
+{.push raises: [], gcsafe.}
+>>>>>>> origin/unstable
 {.used.}
 
 import
@@ -15,14 +19,19 @@ import
   chronos/unittest2/asynctests,
   ../beacon_chain/spec/[presets, crypto, signatures, eth2_ssz_serialization,
                         helpers, forks],
+<<<<<<< HEAD
   ../beacon_chain/spec/mev/[deneb_mev, electra_mev, fulu_mev,
                             rest_deneb_mev_calls, rest_electra_mev_calls,
                             rest_fulu_mev_calls],
+=======
+  ../beacon_chain/spec/mev/[electra_mev, fulu_mev, rest_mev_calls],
+>>>>>>> origin/unstable
   ../beacon_chain/rpc/rest_utils
 
 from std/times import Time, toUnix, fromUnix, getTime
 
 const
+<<<<<<< HEAD
   DenebSlot = Slot(32000)
   ElectraSlot = Slot(64000)
   FuluSlot = Slot(96000)
@@ -32,6 +41,16 @@ const
 type
   MevBlocks = deneb_mev.SignedBlindedBeaconBlock |
               electra_mev.SignedBlindedBeaconBlock |
+=======
+  ElectraSlot = Slot(64000)
+  FuluSlot = Slot(96000)
+  emptyFork = Fork()
+  emptyVersion = emptyFork.current_version
+  emptyRoot = Eth2Digest()
+
+type
+  MevBlocks = electra_mev.SignedBlindedBeaconBlock |
+>>>>>>> origin/unstable
               fulu_mev.SignedBlindedBeaconBlock
 
   TestNodeRef* = ref object
@@ -53,7 +72,11 @@ func specifiedFeeRecipient(x: int): Eth1Address =
   copyMem(addr result, unsafeAddr x, sizeof x)
 
 proc prepareRegistration(
+<<<<<<< HEAD
     fork: Fork,
+=======
+    genesis_fork_version: Version,
+>>>>>>> origin/unstable
     key: ValidatorPrivKey,
     gas_limit: uint64 = 0'u64,
     timestamp: Time,
@@ -62,12 +85,21 @@ proc prepareRegistration(
   var msg =
     SignedValidatorRegistrationV1(
       message: ValidatorRegistrationV1(
+<<<<<<< HEAD
         fee_recipient: ExecutionAddress(data: distinctBase(feeRecipient)),
+=======
+        fee_recipient:feeRecipient,
+>>>>>>> origin/unstable
         gas_limit: gas_limit,
         timestamp: uint64(timestamp.toUnix()),
         pubkey: key.toPubKey().toPubKey()
       ))
+<<<<<<< HEAD
   msg.signature = get_builder_signature(fork, msg.message, key).toValidatorSig()
+=======
+  msg.signature =
+    get_builder_signature(genesis_fork_version, msg.message, key).toValidatorSig()
+>>>>>>> origin/unstable
   msg
 
 proc generateRegistrations(
@@ -81,7 +113,11 @@ proc generateRegistrations(
         raiseAssert "Unable to generate private key"
       feeRecipient = specifiedFeeRecipient(index)
     res.add(prepareRegistration(
+<<<<<<< HEAD
       emptyFork, privateKey, 30_000_000'u64, getTime(), feeRecipient))
+=======
+      emptyVersion, privateKey, 30_000_000'u64, getTime(), feeRecipient))
+>>>>>>> origin/unstable
   res
 
 proc prepare(
@@ -108,8 +144,12 @@ proc prepare(
 
 proc jsonResponseSignedBuilderBid(
     t: typedesc[RestApiResponse],
+<<<<<<< HEAD
     bid: deneb_mev.SignedBuilderBid | electra_mev.SignedBuilderBid |
          fulu_mev.SignedBuilderBid
+=======
+    bid: electra_mev.SignedBuilderBid | fulu_mev.SignedBuilderBid
+>>>>>>> origin/unstable
 ): RestApiResponse =
   let
     consensusFork = typeof(bid).kind()
@@ -129,9 +169,13 @@ proc jsonResponseSignedBuilderBid(
 
 proc jsonResponseExecutionPayloadAndBlobsBundle(
     t: typedesc[RestApiResponse],
+<<<<<<< HEAD
     payload: deneb_mev.ExecutionPayloadAndBlobsBundle |
              electra_mev.ExecutionPayloadAndBlobsBundle |
              fulu_mev.ExecutionPayloadAndBlobsBundle
+=======
+    payload: electra_mev.ExecutionPayloadAndBlobsBundle
+>>>>>>> origin/unstable
 ): RestApiResponse =
   let
     consensusFork = typeof(payload).kind()
@@ -151,8 +195,12 @@ proc jsonResponseExecutionPayloadAndBlobsBundle(
 
 proc sszResponseSignedBuilderBid*(
     t: typedesc[RestApiResponse],
+<<<<<<< HEAD
     bid: deneb_mev.SignedBuilderBid | electra_mev.SignedBuilderBid |
          fulu_mev.SignedBuilderBid,
+=======
+    bid: electra_mev.SignedBuilderBid | fulu_mev.SignedBuilderBid,
+>>>>>>> origin/unstable
 ): RestApiResponse =
   mixin kind
   let
@@ -171,9 +219,13 @@ proc sszResponseSignedBuilderBid*(
 
 proc sszResponseExecutionPayloadAndBlobsBundle*(
     t: typedesc[RestApiResponse],
+<<<<<<< HEAD
     payload: deneb_mev.ExecutionPayloadAndBlobsBundle |
              electra_mev.ExecutionPayloadAndBlobsBundle |
              fulu_mev.ExecutionPayloadAndBlobsBundle,
+=======
+    payload: electra_mev.ExecutionPayloadAndBlobsBundle
+>>>>>>> origin/unstable
 ): RestApiResponse =
   mixin kind
   let
@@ -203,7 +255,11 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
       return RestApiResponse.jsonError(error)
 
     for item in registrations:
+<<<<<<< HEAD
       if not(verify_builder_signature(emptyFork, item.message,
+=======
+      if not(verify_builder_signature(emptyVersion, item.message,
+>>>>>>> origin/unstable
                                       item.message.pubkey, item.signature)):
         return RestApiResponse.jsonError(Http400,
                                          "Signature verification failed")
@@ -232,6 +288,7 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
       else:
         RestApiResponse.jsonError(Http415, "Invalid Accept")
 
+<<<<<<< HEAD
     if qslot == DenebSlot:
       let bid = deneb_mev.SignedBuilderBid(
         message: deneb_mev.BuilderBid(
@@ -242,12 +299,22 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
       let bid = electra_mev.SignedBuilderBid(
         message: electra_mev.BuilderBid(
           header: electra.ExecutionPayloadHeader(parent_hash: qhash))
+=======
+    if qslot == ElectraSlot:
+      let bid = electra_mev.SignedBuilderBid(
+        message: electra_mev.BuilderBid(
+          header: deneb.ExecutionPayloadHeader(parent_hash: qhash))
+>>>>>>> origin/unstable
       )
       respondSszOrJson(contentType, bid)
     elif qslot == FuluSlot:
       let bid = fulu_mev.SignedBuilderBid(
         message: fulu_mev.BuilderBid(
+<<<<<<< HEAD
           header: fulu.ExecutionPayloadHeader(parent_hash: qhash))
+=======
+          header: deneb.ExecutionPayloadHeader(parent_hash: qhash))
+>>>>>>> origin/unstable
       )
       respondSszOrJson(contentType, bid)
     else:
@@ -267,7 +334,11 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
                                          sszMediaType).valueOr:
         return RestApiResponse.jsonError(Http406, "Content type not acceptable")
 
+<<<<<<< HEAD
     if consensusFork < ConsensusFork.Deneb:
+=======
+    if consensusFork < ConsensusFork.Electra:
+>>>>>>> origin/unstable
       return RestApiResponse.jsonError(Http400, "Unsupported fork version")
 
     template respondSszOrJson(contentType, payload: auto): RestApiResponse =
@@ -278,6 +349,7 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
       else:
         RestApiResponse.jsonError(Http415, "Invalid Accept")
 
+<<<<<<< HEAD
     if consensusFork == ConsensusFork.Deneb:
       let
         blck =
@@ -305,12 +377,16 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
         )
       respondSszOrJson(contentType, payload)
     elif consensusFork == ConsensusFork.Electra:
+=======
+    if consensusFork == ConsensusFork.Electra:
+>>>>>>> origin/unstable
       let
         blck =
           decodeBodyJsonOrSsz(electra_mev.SignedBlindedBeaconBlock,
                               contentBody.get()).valueOr:
             return RestApiResponse.jsonError(error)
         payload = electra_mev.ExecutionPayloadAndBlobsBundle(
+<<<<<<< HEAD
           execution_payload: electra.ExecutionPayload(
             parent_hash: blck.message.body.execution_payload_header.parent_hash
           ),
@@ -328,16 +404,51 @@ proc setupEngineAPI*(router: var RestRouter, node: TestNodeRef) =
             parent_hash: blck.message.body.execution_payload_header.parent_hash
           ),
           blobs_bundle: BlobsBundle()
+=======
+          execution_payload: deneb.ExecutionPayload(
+            parent_hash: blck.message.body.execution_payload_header.parent_hash
+          ),
+          blobs_bundle: deneb.BlobsBundle()
+>>>>>>> origin/unstable
         )
       respondSszOrJson(contentType, payload)
     else:
       raiseAssert "Unsupported fork version"
 
+<<<<<<< HEAD
+=======
+  router.api2(MethodPost, "/eth/v2/builder/blinded_blocks") do (
+    contentBody: Option[ContentBody]) -> RestApiResponse:
+
+    if contentBody.isNone:
+      return RestApiResponse.jsonError(Http400, EmptyRequestBodyError)
+
+    let
+      rawVersion = request.headers.getString("eth-consensus-version")
+      consensusFork = ConsensusFork.decodeString(rawVersion).valueOr:
+        return RestApiResponse.jsonError(Http400, "Invalid consensus version")
+      contentType = preferredContentType(jsonMediaType,
+                                         sszMediaType).valueOr:
+        return RestApiResponse.jsonError(Http406, "Content type not acceptable")
+
+    if consensusFork < ConsensusFork.Fulu:
+      return RestApiResponse.jsonError(Http400, "Unsupported fork version")
+
+    if contentType in [sszMediaType, jsonMediaType]:
+      RestApiResponse.response(
+        Http202, headers=[("eth-consensus-version", consensusFork.toString)])
+    else:
+      RestApiResponse.jsonError(Http415, "Invalid Accept")
+
+>>>>>>> origin/unstable
   router.api2(MethodGet, "/eth/v1/builder/status") do () -> RestApiResponse:
     RestApiResponse.response(Http200)
 
 proc testSuite() =
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/unstable
   suite "MEV calls serialization/deserialization and behavior test suite":
     let
       rng = HmacDrbgContext.new()
@@ -399,6 +510,7 @@ proc testSuite() =
 
       let
         response1 =
+<<<<<<< HEAD
           await client.getHeaderDenebPlain(DenebSlot, parent_hash,
             publicKey, restAcceptType = restAcceptType1)
         response2 =
@@ -406,6 +518,15 @@ proc testSuite() =
             publicKey, restAcceptType = restAcceptType2)
         response3 =
           await client.getHeaderFuluPlain(FuluSlot, parent_hash,
+=======
+          await client.getHeaderPlain(ElectraSlot, parent_hash,
+            publicKey, restAcceptType = restAcceptType1)
+        response2 =
+          await client.getHeaderPlain(ElectraSlot, parent_hash,
+            publicKey, restAcceptType = restAcceptType2)
+        response3 =
+          await client.getHeaderPlain(FuluSlot, parent_hash,
+>>>>>>> origin/unstable
             publicKey, restAcceptType = restAcceptType3)
 
       check:
@@ -425,13 +546,21 @@ proc testSuite() =
         version3 = response3.headers.getString("eth-consensus-version")
 
       check:
+<<<<<<< HEAD
         version1 == ConsensusFork.Deneb.toString()
+=======
+        version1 == ConsensusFork.Electra.toString()
+>>>>>>> origin/unstable
         version2 == ConsensusFork.Electra.toString()
         version3 == ConsensusFork.Fulu.toString()
 
       let
         bid1res =
+<<<<<<< HEAD
           decodeBytesJsonOrSsz(GetHeaderResponseDeneb, response1.data,
+=======
+          decodeBytesJsonOrSsz(GetHeaderResponseElectra, response1.data,
+>>>>>>> origin/unstable
             response1.contentType, version1)
         bid2res =
           decodeBytesJsonOrSsz(GetHeaderResponseElectra, response2.data,
@@ -473,7 +602,11 @@ proc testSuite() =
 
       let
         blck1 =
+<<<<<<< HEAD
           prepare(deneb_mev.SignedBlindedBeaconBlock, DenebSlot, parent_hash1,
+=======
+          prepare(electra_mev.SignedBlindedBeaconBlock, ElectraSlot, parent_hash1,
+>>>>>>> origin/unstable
                   0'u64, privateKey1)
         blck2 =
           prepare(electra_mev.SignedBlindedBeaconBlock, ElectraSlot, parent_hash2,
@@ -509,7 +642,11 @@ proc testSuite() =
           else:
             ("application/json,application/octet-stream;q=0.9",
              ApplicationJsonMediaType)
+<<<<<<< HEAD
         (restAcceptType3, responseMediaType3) =
+=======
+        (restAcceptType3, _) =
+>>>>>>> origin/unstable
           if responseKind == TestKind.Ssz:
             ("application/json;q=0.5,application/octet-stream;q=1.0",
              OctetStreamMediaType)
@@ -523,7 +660,11 @@ proc testSuite() =
             restContentType = restContentType1,
             restAcceptType = restAcceptType1,
             extraHeaders = @[("eth-consensus-version",
+<<<<<<< HEAD
                               toString(ConsensusFork.Deneb))])
+=======
+                              toString(ConsensusFork.Electra))])
+>>>>>>> origin/unstable
         response2 =
           await client.submitBlindedBlockPlain(
             blck2,
@@ -532,7 +673,11 @@ proc testSuite() =
             extraHeaders = @[("eth-consensus-version",
                               toString(ConsensusFork.Electra))])
         response3 =
+<<<<<<< HEAD
           await client.submitBlindedBlockPlain(
+=======
+          await client.submitBlindedBlockV2Plain(
+>>>>>>> origin/unstable
             blck3,
             restContentType = restContentType3,
             restAcceptType = restAcceptType3,
@@ -541,7 +686,11 @@ proc testSuite() =
       check:
         response1.status == 200
         response2.status == 200
+<<<<<<< HEAD
         response3.status == 200
+=======
+        response3.status == 202
+>>>>>>> origin/unstable
 
       let
         version1 = response1.headers.getString("eth-consensus-version")
@@ -551,32 +700,50 @@ proc testSuite() =
       check:
         response1.contentType.isSome()
         response2.contentType.isSome()
+<<<<<<< HEAD
         response3.contentType.isSome()
         response1.contentType.get().mediaType == responseMediaType1
         response2.contentType.get().mediaType == responseMediaType2
         response3.contentType.get().mediaType == responseMediaType3
         version1 == ConsensusFork.Deneb.toString()
+=======
+        response1.contentType.get().mediaType == responseMediaType1
+        response2.contentType.get().mediaType == responseMediaType2
+        version1 == ConsensusFork.Electra.toString()
+>>>>>>> origin/unstable
         version2 == ConsensusFork.Electra.toString()
         version3 == ConsensusFork.Fulu.toString()
 
       let
         payload1res =
+<<<<<<< HEAD
           decodeBytesJsonOrSsz(SubmitBlindedBlockResponseDeneb,
+=======
+          decodeBytesJsonOrSsz(SubmitBlindedBlockResponseElectra,
+>>>>>>> origin/unstable
             response1.data, response1.contentType, version1)
         payload2res =
           decodeBytesJsonOrSsz(SubmitBlindedBlockResponseElectra,
             response2.data, response2.contentType, version2)
+<<<<<<< HEAD
         payload3res =
           decodeBytesJsonOrSsz(SubmitBlindedBlockResponseFulu,
             response3.data, response3.contentType, version3)
+=======
+>>>>>>> origin/unstable
 
       check:
         payload1res.isOk()
         payload2res.isOk()
+<<<<<<< HEAD
         payload3res.isOk()
         payload1res.get().data.execution_payload.parent_hash == parent_hash1
         payload2res.get().data.execution_payload.parent_hash == parent_hash2
         payload3res.get().data.execution_payload.parent_hash == parent_hash3
+=======
+        payload1res.get().data.execution_payload.parent_hash == parent_hash1
+        payload2res.get().data.execution_payload.parent_hash == parent_hash2
+>>>>>>> origin/unstable
 
     asyncTest "/eth/v1/builder/status test":
       let response = await client.getStatus()

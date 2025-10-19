@@ -5,46 +5,56 @@
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
-{.push raises: [].}
+{.push raises: [], gcsafe.}
 
-# This module is responsible for handling beacon node validators, ie those that
-# that are running directly in the beacon node and not in a separate validator
-# client process - we name these "beacon validators" while those running
-# outside are "client validators".
-# This module also contains implementation logic for the REST validator API.
+## This module is responsible for handling beacon node validators, ie those that
+## that are running directly in the beacon node and not in a separate validator
+## client process - we name these "beacon validators" while those running
+## outside are "client validators".
 
 import
   # Standard library
   std/[os, tables],
 
   # Nimble packages
-  stew/[assign2, byteutils],
-  chronos, metrics,
-  chronicles, chronicles/timings,
-  json_serialization/std/[options, sets, net],
-  eth/db/kvstore,
-  web3/primitives,
-  kzg4844,
+  stew/byteutils,
+  chronos,
+  metrics,
+  chronicles,
+  json_serialization/std/[sets, net],
 
   # Local modules
   ../spec/[
-    eth2_merkleization, forks, helpers, network, signatures, state_transition,
-    validator],
+    eth2_merkleization, forks, helpers, network,
+    peerdas_helpers, signatures, state_transition,
+    state_transition_block, validator,
+  ],
+  ../spec/mev/rest_mev_calls,
   ../consensus_object_pools/[
-    spec_cache, blockchain_dag, block_clearance, attestation_pool,
-    sync_committee_msg_pool, validator_change_pool, consensus_manager,
-    common_tools],
+    spec_cache, blockchain_dag, attestation_pool, sync_committee_msg_pool,
+    validator_change_pool, consensus_manager, common_tools,
+  ],
   ../el/el_manager,
   ../networking/eth2_network,
+<<<<<<< HEAD
   ../sszdump, ../sync/sync_manager,
   ../gossip_processing/block_processor,
   ".."/[conf, beacon_clock, beacon_node],
   "."/[
     keystore_management, slashing_protection, validator_duties, validator_pool],
   ".."/spec/mev/[rest_deneb_mev_calls, rest_electra_mev_calls, rest_fulu_mev_calls]
+=======
+  ../sszdump,
+  ../[conf, beacon_clock, beacon_node],
+  ./[
+    block_payloads, keystore_management, slashing_protection, validator_duties,
+    validator_pool,
+  ]
+>>>>>>> origin/unstable
 
 from std/sequtils import mapIt
 from eth/async_utils import awaitWithTimeout
+from ./message_router_mev import unblindAndRouteBlockMEV
 
 # Metrics for tracking attestation and beacon block loss
 declareCounter beacon_light_client_finality_updates_sent,
@@ -75,6 +85,7 @@ declarePublicGauge(attached_validator_balance_total,
 
 logScope: topics = "beacval"
 
+<<<<<<< HEAD
 type
   EngineBid = object
     blck*: ForkedBeaconBlock
@@ -113,6 +124,8 @@ func init(t: typedesc[BoostFactor], value: uint8): BoostFactor =
 func init(t: typedesc[BoostFactor], value: uint64): BoostFactor =
   BoostFactor(kind: BoostFactorKind.Builder, value64: value)
 
+=======
+>>>>>>> origin/unstable
 func getValidator*(validators: auto,
                    pubkey: ValidatorPubKey): Opt[ValidatorAndIndex] =
   let idx = validators.findIt(it.pubkey == pubkey)
@@ -128,6 +141,16 @@ func blockConsensusValue(r: BlockRewards): UInt256 {.noinit.} =
   # Returns value of `block-consensus-value` in Wei units.
   u256(r.attestations + r.sync_aggregate +
     r.proposer_slashings + r.attester_slashings) * u256(1000000000)
+
+proc getFeeRecipient(node: BeaconNode,
+                     pubkey: ValidatorPubKey,
+                     validatorIdx: Opt[ValidatorIndex],
+                     epoch: Epoch): Eth1Address =
+  node.consensusManager[].getFeeRecipient(pubkey, validatorIdx, epoch)
+
+proc getGasLimit(node: BeaconNode,
+                 pubkey: ValidatorPubKey): uint64 =
+  node.consensusManager[].getGasLimit(pubkey)
 
 proc addValidatorsFromWeb3Signer(
     node: BeaconNode, web3signerUrl: Web3SignerUrl, epoch: Epoch)
@@ -147,9 +170,8 @@ proc addValidatorsFromWeb3Signer(
           Opt.some(data.get().index)
         else:
           Opt.none(ValidatorIndex)
-      feeRecipient =
-        node.consensusManager[].getFeeRecipient(keystore.pubkey, index, epoch)
-      gasLimit = node.consensusManager[].getGasLimit(keystore.pubkey)
+      feeRecipient = node.getFeeRecipient(keystore.pubkey, index, epoch)
+      gasLimit = node.getGasLimit(keystore.pubkey)
       v = node.attachedValidators[].addValidator(keystore, feeRecipient,
                                                  gasLimit)
     node.attachedValidators[].updateValidator(v, data)
@@ -168,9 +190,8 @@ proc addValidators*(node: BeaconNode) {.async: (raises: [CancelledError]).} =
           Opt.some(data.get().index)
         else:
           Opt.none(ValidatorIndex)
-      feeRecipient = node.consensusManager[].getFeeRecipient(
-        keystore.pubkey, index, epoch)
-      gasLimit = node.consensusManager[].getGasLimit(keystore.pubkey)
+      feeRecipient = node.getFeeRecipient(keystore.pubkey, index, epoch)
+      gasLimit = node.getGasLimit(keystore.pubkey)
 
       v = node.attachedValidators[].addValidator(keystore, feeRecipient,
                                                  gasLimit)
@@ -197,10 +218,8 @@ proc pollForDynamicValidators*(node: BeaconNode,
     let
       epoch = node.currentSlot().epoch
       index = Opt.none(ValidatorIndex)
-      feeRecipient =
-        node.consensusManager[].getFeeRecipient(keystore.pubkey, index, epoch)
-      gasLimit =
-        node.consensusManager[].getGasLimit(keystore.pubkey)
+      feeRecipient = node.getFeeRecipient(keystore.pubkey, index, epoch)
+      gasLimit = node.getGasLimit(keystore.pubkey)
     discard node.attachedValidators[].addValidator(keystore, feeRecipient,
                                                    gasLimit)
 
@@ -274,7 +293,7 @@ proc handleLightClientUpdates*(node: BeaconNode, slot: Slot)
   static: doAssert lightClientFinalityUpdateSlotOffset ==
     lightClientOptimisticUpdateSlotOffset
   let sendTime = node.beaconClock.fromNow(
-    slot.light_client_finality_update_time())
+    slot.light_client_finality_update_time(node.dag.cfg.time))
   if sendTime.inFuture:
     debug "Waiting to send LC updates", slot, delay = shortLog(sendTime.offset)
     await sleepAsync(sendTime.offset)
@@ -362,6 +381,7 @@ proc createAndSendAttestation(node: BeaconNode,
     discard await node.router.routeAttestation(
       registered.toSingleAttestation(signature), subnet_id,
       checkSignature = false, checkValidator = false)
+<<<<<<< HEAD
   else:
     discard await node.router.routeAttestation(
       registered.toAttestation(signature), subnet_id,
@@ -611,9 +631,14 @@ proc makeBeaconBlockForHeadAndSlot*(
       consensusBlockValue: res.get().rewards.blockConsensusValue(),
       blobsBundleOpt: blobsBundleOpt,
     ))
+=======
+>>>>>>> origin/unstable
   else:
-    err(res.error)
+    discard await node.router.routeAttestation(
+      registered.toAttestation(signature), subnet_id,
+      checkSignature = false, checkValidator = false)
 
+<<<<<<< HEAD
 # TODO what is this for
 proc makeBeaconBlockForHeadAndSlot*(
     PayloadType: type ForkyExecutionPayloadForSigning, node: BeaconNode, randao_reveal: ValidatorSig,
@@ -1358,49 +1383,303 @@ proc proposeBlockAux(
     return newBlockRef.get()
 
 proc proposeBlock(
+=======
+proc registerBlock(
+>>>>>>> origin/unstable
     node: BeaconNode,
     validator: AttachedValidator,
     validator_index: ValidatorIndex,
+    blck: ForkyBeaconBlock | ForkyBlindedBeaconBlock,
+): Result[Eth2Digest, string] =
+  let
+    fork = node.dag.forkAtEpoch(blck.slot.epoch)
+    genesis_validators_root = node.dag.genesis_validators_root
+    blockRoot = hash_tree_root(blck)
+    signingRoot =
+      compute_block_signing_root(fork, genesis_validators_root, blck.slot, blockRoot)
+
+  node.attachedValidators[].slashingProtection.registerBlock(
+    validator_index, validator.pubkey, blck.slot, signingRoot
+  ).isOkOr:
+    warn "Slashing protection activated for block proposal",
+      blockRoot = shortLog(blockRoot),
+      blck = shortLog(blck),
+      signingRoot = shortLog(signingRoot),
+      validator = validator.pubkey,
+      slot = blck.slot,
+      existingProposal = error
+    return err("Proposal would be slashable: " & $error)
+  ok blockRoot
+
+proc getBlockSignature(
+    node: BeaconNode,
+    validator: AttachedValidator,
+    blockRoot: Eth2Digest,
+    blck: ForkyBeaconBlock | ForkyBlindedBeaconBlock,
+): Future[Result[ValidatorSig, string]] {.async: (raises: [CancelledError]).} =
+  # Check with slashing protection before submitBlindedBlock
+  let
+    fork = node.dag.forkAtEpoch(blck.slot.epoch)
+    genesis_validators_root = node.dag.genesis_validators_root
+
+    res =
+      await validator.getBlockSignature(fork, genesis_validators_root, blockRoot, blck)
+
+  if res.isErr:
+    warn "Could not get block proposal signature",
+      validator = shortLog(validator),
+      blockRoot = shortLog(blockRoot),
+      blck = shortLog(blck),
+      err = res.error
+
+  res
+
+proc proposeBlockAux(
+    node: BeaconNode,
+    consensusFork: static ConsensusFork,
+    validator: AttachedValidator,
     head: BlockRef,
-    slot: Slot
+    slot: Slot,
+    randao_reveal: ValidatorSig,
 ): Future[BlockRef] {.async: (raises: [CancelledError]).} =
-  if head.slot >= slot:
-    # We should normally not have a head newer than the slot we're proposing for
-    # but this can happen if block proposal is delayed
-    warn "Skipping proposal, have newer head already",
-      headSlot = shortLog(head.slot),
-      headBlockRoot = shortLog(head.root),
-      slot = shortLog(slot)
+  var
+    cache = new StateCache
+    # TODO move the creation of this proposal state away from the hot path
+    state = node.dag.getProposalState(head, slot, cache[]).valueOr:
+      beacon_block_production_errors.inc()
+      return head
+
+  let
+    graffiti = node.getGraffitiBytes(validator)
+    validator_index = validator.index.expect("index set for proposer")
+
+    engineBid =
+      when consensusFork == ConsensusFork.Gloas:
+        debugGloasComment "when need to getExecutionPayload/getPayload"
+        default(Opt[EngineBid[gloas.ExecutionPayloadForSigning]])
+      elif consensusFork >= ConsensusFork.Electra:
+        # Fetch both builder and engine payloads then use the better one to
+        # make a block
+        let
+          payloadBuilderClient =
+            node.getPayloadBuilderClient(validator_index.distinctBase).valueOr(nil)
+
+          bids = await node.collectBids(
+            consensusFork, payloadBuilderClient, validator.pubkey, validator_index,
+            head, slot, state,
+          )
+
+          localBlockValueBoost = node.config.localBlockValueBoost
+          useBuilderPayload =
+            bids.useBuilderPayload(BoostFactor.init(localBlockValueBoost))
+
+        if payloadBuilderClient != nil:
+          # Log payload selection only if the user enabled builder support
+          info "Payload selected",
+            slot,
+            validator = shortLog(validator),
+            localBlockValueBoost,
+            useBuilderPayload,
+            hasBuilderPayload = bids.builderBid.isSome(),
+            hasEnginePayload = bids.engineBid.isSome()
+
+        if useBuilderPayload:
+          doAssert bids.builderBid.isSome(), "Checked in useBuilderPayload"
+          let builderBlockRes = node.makeBuilderBlock(
+            consensusFork,
+            state[].forky(consensusFork),
+            cache[],
+            validator_index,
+            randao_reveal,
+            graffiti,
+            head,
+            slot,
+            bids.builderBid.value(),
+          )
+
+          if builderBlockRes.isOk:
+            # Slashing database serves as the cutoff point for falling back to
+            # engine blocks since failures from this point onwards should be
+            # independent of the (type of) payload.
+            template blck(): untyped =
+              builderBlockRes.get().blck
+
+            let
+              blockRoot = node.registerBlock(validator, validator_index, blck).valueOr:
+                beacon_block_builder_missed_without_fallback.inc()
+                beacon_block_production_errors.inc()
+                return head
+
+              signature = (await node.getBlockSignature(validator, blockRoot, blck)).valueOr:
+                beacon_block_builder_missed_without_fallback.inc()
+                beacon_block_production_errors.inc()
+                return head
+
+              blindedBlock = consensusFork.SignedBlindedBeaconBlock(
+                message: blck, signature: signature
+              )
+
+              unblindedBlockRef =
+                await node.unblindAndRouteBlockMEV(payloadBuilderClient, blindedBlock)
+
+            if unblindedBlockRef.isErr:
+              # unblindedBlockRef.isErr or unblindedBlockRef.get.isNone indicates that
+              # the block failed to validate or integrate into the DAG, which for the
+              # purpose of this return value, is equivalent. It's used to drive Beacon
+              # REST API output.
+              #
+              # https://collective.flashbots.net/t/post-mortem-april-3rd-2023-mev-boost-relay-incident-and-related-timing-issue/1540
+              # has caused false positives, because
+              # "A potential mitigation to this attack is to introduce a cutoff timing
+              # into the proposer's slot whereafter this time (e.g. 3 seconds) the relay
+              # will no longer return a block to the proposer. Relays began to roll out
+              # this mitigation in the evening of April 3rd UTC time with a 2 second
+              # cutoff, and notified other relays to do the same. After receiving
+              # credible reports of honest validators missing their slots the suggested
+              # timing cutoff was increased to 3 seconds."
+              let errMsg =
+                if unblindedBlockRef.isErr:
+                  unblindedBlockRef.error
+                else:
+                  "Unblinded block not returned to proposer"
+
+              warn "Failed to unblind or route builder payload",
+                validator = shortLog(validator),
+                blck = shortLog(blindedBlock.message),
+                err = errMsg
+
+              # TODO Just because the relay didn't answer doesn't mean it was missed?
+              beacon_block_builder_missed_without_fallback.inc()
+
+              return head
+
+            when consensusFork >= ConsensusFork.Fulu:
+              if unblindedBlockRef.get.isNone:
+                # This corresponds to 202 in Fulu MEV.
+                return head
+            else:
+              if unblindedBlockRef.get.isNone:
+                warn "Failed to unblind or route builder payload",
+                  validator = shortLog(validator),
+                  blck = shortLog(blindedBlock.message),
+                  err = "Unblinded block not returned to proposer"
+                return head
+
+            beacon_blocks_proposed.inc()
+            return unblindedBlockRef.get.get
+
+          if bids.engineBid.isNone() and state[].is_merge_transition_complete():
+            # Cannot fall back to engine without a payload, post merge
+            beacon_block_production_errors.inc()
+            return head
+
+          beacon_block_builder_missed_with_fallback.inc()
+
+          notice "Failed to create builder-based block, trying engine payload",
+            slot, error = builderBlockRes.error
+
+          # makeBuilderBlock will invalidate the state - get a new one
+          cache = new StateCache
+          state = node.dag.getProposalState(head, slot, cache[]).valueOr:
+            beacon_block_production_errors.inc()
+            return head
+
+        bids.engineBid
+      else:
+        await node.getExecutionPayload(
+          consensusFork, head, state, validator_index, validator.pubkey
+        )
+
+  if engineBid.isNone():
+    beacon_block_production_errors.inc()
     return head
 
   let
+    engineBlock = node.makeEngineBlock(
+      consensusFork,
+      state[].forky(consensusFork),
+      cache[],
+      validator_index,
+      randao_reveal,
+      graffiti,
+      head,
+      slot,
+      engineBid[].eps,
+      engineBid[].execution_requests,
+    ).valueOr:
+      beacon_block_production_errors.inc()
+      return head
+
+    blockRoot = node.registerBlock(validator, validator_index, engineBlock.blck).valueOr:
+      beacon_block_production_errors.inc()
+      return head
+
+    signature = await(node.getBlockSignature(validator, blockRoot, engineBlock.blck)).valueOr:
+      beacon_block_production_errors.inc()
+      return head
+
+    signedBlock = consensusFork.SignedBeaconBlock(
+      message: engineBlock.blck, signature: signature, root: blockRoot
+    )
+
+    blobsOpt =
+      when consensusFork in [ConsensusFork.Deneb, ConsensusFork.Electra]:
+        Opt.some(
+          signedBlock.create_blob_sidecars(
+            deneb.KzgProofs(engineBlock.blobsBundle.proofs),
+            engineBlock.blobsBundle.blobs))
+      else:
+        Opt.none(seq[BlobSidecar])
+
+    columnsOpt =
+      when consensusFork >= ConsensusFork.Fulu:
+        Opt.some(signedBlock.assemble_data_column_sidecars(
+          engineBlock.blobsBundle.blobs.mapIt(kzg.KzgBlob(bytes: it)),
+          @(engineBlock.blobsBundle.proofs.mapIt(kzg.KzgProof(it)))))
+      else:
+        Opt.none(seq[fulu.DataColumnSidecar])
+    newBlockRef = await(
+      node.router.routeSignedBeaconBlock(signedBlock, blobsOpt,
+        columnsOpt, checkValidator = false)
+    ).valueOr:
+      # TODO Is this an error?
+      beacon_block_production_errors.inc()
+      return head # Errors logged in router
+
+  if newBlockRef.isNone():
+    # TODO is this an error?
+    beacon_block_production_errors.inc()
+    return head # Validation errors logged in router
+
+  notice "Block proposed",
+    blockRoot = shortLog(blockRoot),
+    blck = shortLog(signedBlock.message),
+    signature = shortLog(signature),
+    validator = shortLog(validator)
+
+  beacon_blocks_proposed.inc()
+
+  newBlockRef.get()
+
+proc proposeBlock(
+    node: BeaconNode, validator: AttachedValidator, head: BlockRef, slot: Slot
+): Future[BlockRef] {.async: (raises: [CancelledError]).} =
+  let
     fork = node.dag.forkAtEpoch(slot.epoch)
     genesis_validators_root = node.dag.genesis_validators_root
-    randao = block:
-      let res = await validator.getEpochSignature(
-        fork, genesis_validators_root, slot.epoch)
-      if res.isErr():
-        warn "Unable to generate randao reveal",
-             validator = shortLog(validator), error_msg = res.error()
-        return head
-      res.get()
+    randao_reveal = (
+      await validator.getEpochSignature(fork, genesis_validators_root, slot.epoch)
+    ).valueOr:
+      warn "Unable to generate randao reveal",
+        validator = shortLog(validator), error_msg = error
+      return head
 
-  template proposeBlockContinuation(type1, type2: untyped): auto =
-    await proposeBlockAux(
-      type1, type2, node, validator, validator_index, head, slot, randao, fork,
-        genesis_validators_root, node.config.localBlockValueBoost)
-
-  return withConsensusFork(node.dag.cfg.consensusForkAtEpoch(slot.epoch)):
-    when consensusFork >= ConsensusFork.Deneb:
-      proposeBlockContinuation(
-        consensusFork.SignedBlindedBeaconBlock,
-        consensusFork.ExecutionPayloadForSigning)
+  withConsensusFork(node.dag.cfg.consensusForkAtEpoch(slot.epoch)):
+    when consensusFork >= ConsensusFork.Bellatrix:
+      await node.proposeBlockAux(consensusFork, validator, head, slot, randao_reveal)
     else:
-      # Pre-Deneb MEV is not supported; this signals that, because it triggers
-      # intentional SignedBlindedBeaconBlock/ExecutionPayload mismatches.
-      proposeBlockContinuation(
-        deneb_mev.SignedBlindedBeaconBlock,
-        max(ConsensusFork.Bellatrix, consensusFork).ExecutionPayloadForSigning)
+      warn "Block proposals for fork no longer supported", consensusFork
+      head
 
 proc sendAttestations(node: BeaconNode, head: BlockRef, slot: Slot) =
   ## Perform all attestations that the validators attached to this node should
@@ -1613,6 +1892,15 @@ proc handleProposal(node: BeaconNode, head: BlockRef, slot: Slot):
   ## that is supposed to do so, given the shuffling at that slot for the given
   ## head - to compute the proposer, we need to advance a state to the given
   ## slot
+  if head.slot >= slot:
+    # We should normally not have a head newer than the slot we're proposing for
+    # but this can happen if block proposal is delayed
+    warn "Skipping proposal, have newer head already",
+      headSlot = shortLog(head.slot),
+      headBlockRoot = shortLog(head.root),
+      slot = shortLog(slot)
+    return head
+
   let
     proposer = node.dag.getProposer(head, slot).valueOr:
       return head
@@ -1624,7 +1912,7 @@ proc handleProposal(node: BeaconNode, head: BlockRef, slot: Slot):
                                         proposer = shortLog(proposerKey)
       return head
 
-  return await proposeBlock(node, validator, proposer, head, slot)
+  await proposeBlock(node, validator, head, slot)
 
 proc signAndSendAggregate(
     node: BeaconNode, validator: AttachedValidator, shufflingRef: ShufflingRef,
@@ -1677,6 +1965,7 @@ proc signAndSendAggregate(
         return
 
     signAndSendAggregatedAttestations()
+<<<<<<< HEAD
   else:
     # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.2/specs/phase0/validator.md#construct-aggregate
     # https://github.com/ethereum/consensus-specs/blob/v1.5.0-beta.2/specs/phase0/validator.md#aggregateandproof
@@ -1690,6 +1979,8 @@ proc signAndSendAggregate(
         return
 
     signAndSendAggregatedAttestations()
+=======
+>>>>>>> origin/unstable
 
 proc sendAggregatedAttestations(
     node: BeaconNode, head: BlockRef, slot: Slot) =
@@ -1750,32 +2041,32 @@ from std/times import epochTime
 proc getValidatorRegistration(
     node: BeaconNode, validator: AttachedValidator, epoch: Epoch):
     Future[Result[SignedValidatorRegistrationV1, string]] {.async: (raises: [CancelledError]).} =
-  let validatorIdx = validator.index.valueOr:
+  if validator.index.isNone:
     # The validator index will be missing when the validator was not
     # activated for duties yet. We can safely skip the registration then.
     return
 
-  let feeRecipient = node.getFeeRecipient(validator.pubkey, validatorIdx, epoch)
-  let gasLimit = node.getGasLimit(validator.pubkey)
+  let
+    feeRecipient = node.getFeeRecipient(validator.pubkey, validator.index, epoch)
+    gasLimit = node.getGasLimit(validator.pubkey)
+
   var validatorRegistration = SignedValidatorRegistrationV1(
     message: ValidatorRegistrationV1(
-      fee_recipient: ExecutionAddress(data: distinctBase(feeRecipient)),
+      fee_recipient: feeRecipient,
       gas_limit: gasLimit,
       timestamp: epochTime().uint64,
-      pubkey: validator.pubkey))
+      pubkey: validator.pubkey,
+    )
+  )
 
-  let signature = await validator.getBuilderSignature(
-    node.dag.cfg.genesisFork, validatorRegistration.message)
+  debug "getValidatorRegistration: registering", validatorRegistration
 
-  debug "getValidatorRegistration: registering",
-    validatorRegistration
+  validatorRegistration.signature =
+    ?await validator.getBuilderSignature(
+      node.dag.cfg.GENESIS_FORK_VERSION, validatorRegistration.message
+    )
 
-  if signature.isErr:
-    return err signature.error
-
-  validatorRegistration.signature = signature.get
-
-  return ok validatorRegistration
+  ok validatorRegistration
 
 proc registerValidatorsPerBuilder(
     node: BeaconNode, payloadBuilderAddress: string, epoch: Epoch,
@@ -2006,13 +2297,14 @@ proc handleValidatorDuties*(node: BeaconNode, lastSlot, slot: Slot) {.async: (ra
   withState(node.dag.headState):
     node.updateValidators(forkyState.data.validators.asSeq())
 
-  let newHead = await handleProposal(node, head, slot)
+  let
+    timeConfig = node.dag.cfg.time
+    newHead = await handleProposal(node, head, slot)
   head = newHead
 
-  let
-    # The latest point in time when we'll be sending out attestations
-    attestationCutoff = node.beaconClock.fromNow(slot.attestation_deadline())
-
+  # The latest point in time when we'll be sending out attestations
+  let attestationCutoff = node.beaconClock.fromNow(
+    slot.attestation_deadline(timeConfig))
   if attestationCutoff.inFuture:
     debug "Waiting to send attestations",
       head = shortLog(head),
@@ -2040,8 +2332,8 @@ proc handleValidatorDuties*(node: BeaconNode, lastSlot, slot: Slot) {.async: (ra
   # the result in aggregates
   static:
     doAssert aggregateSlotOffset == syncContributionSlotOffset, "Timing change?"
-  let
-    aggregateCutoff = node.beaconClock.fromNow(slot.aggregate_deadline())
+  let aggregateCutoff = node.beaconClock.fromNow(
+    slot.aggregate_deadline(timeConfig))
   if aggregateCutoff.inFuture:
     debug "Waiting to send aggregate attestations",
       aggregateCutoff = shortLog(aggregateCutoff.offset)
@@ -2095,6 +2387,7 @@ proc registerDuties*(node: BeaconNode, wallSlot: Slot) {.async: (raises: [Cancel
 
         node.consensusManager[].actionTracker.registerDuty(
           slot, subnet_id, validator_index, isAggregator)
+<<<<<<< HEAD
 
 proc makeMaybeBlindedBeaconBlockForHeadAndSlotImpl[ResultType](
     node: BeaconNode, consensusFork: static ConsensusFork,
@@ -2175,3 +2468,5 @@ proc makeMaybeBlindedBeaconBlockForHeadAndSlot*(
   makeMaybeBlindedBeaconBlockForHeadAndSlotImpl[ResultType](
     node, consensusFork, randao_reveal, graffiti, head, slot,
     builderBoostFactor)
+=======
+>>>>>>> origin/unstable

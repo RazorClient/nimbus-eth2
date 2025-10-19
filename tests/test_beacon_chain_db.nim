@@ -10,13 +10,13 @@
 
 import
   unittest2,
-  ../beacon_chain/beacon_chain_db,
+  ../beacon_chain/[beacon_chain_db, beacon_chain_db_quarantine],
   ../beacon_chain/consensus_object_pools/block_dag,
   ../beacon_chain/spec/forks,
   ./testutil
 
 from std/algorithm import sort
-from std/sequtils import toSeq
+from std/sequtils import allIt, toSeq
 from snappy import encodeFramed, uncompressedLenFramed
 from ../beacon_chain/consensus_object_pools/block_pools_types import
   ChainDAGRef
@@ -25,6 +25,7 @@ from ../beacon_chain/spec/beaconstate import
   initialize_hashed_beacon_state_from_eth1
 from ../beacon_chain/spec/state_transition import noRollback
 from ../beacon_chain/validators/validator_monitor import ValidatorMonitor
+from ./consensus_spec/fixtures_utils import genesisTestruntimeConfig
 from ./mocking/mock_genesis import mockEth1BlockHash
 from ./testblockutil import makeInitialDeposits
 from ./testdbutil import makeTestDB
@@ -33,13 +34,78 @@ from ./teststateutil import getTestStates
 when isMainModule:
   import chronicles # or some random compile error happens...
 
-proc getPhase0StateRef(db: BeaconChainDB, root: Eth2Digest):
-    phase0.NilableBeaconStateRef =
-  # load beaconstate the way the block pool does it - into an existing instance
-  let res = (phase0.BeaconStateRef)()
-  if db.getState(root, res[], noRollback):
-    return res
+template BeaconStateRef(kind: static ConsensusFork): typedesc =
+  when kind == ConsensusFork.Gloas:
+    gloas.BeaconStateRef
+  elif kind == ConsensusFork.Fulu:
+    fulu.BeaconStateRef
+  elif kind == ConsensusFork.Electra:
+    electra.BeaconStateRef
+  elif kind == ConsensusFork.Deneb:
+    deneb.BeaconStateRef
+  elif kind == ConsensusFork.Capella:
+    capella.BeaconStateRef
+  elif kind == ConsensusFork.Bellatrix:
+    bellatrix.BeaconStateRef
+  elif kind == ConsensusFork.Altair:
+    altair.BeaconStateRef
+  elif kind == ConsensusFork.Phase0:
+    phase0.BeaconStateRef
+  else:
+    {.error: "BeaconStateRef unsupported in " & $kind.}
 
+template NilableBeaconStateRef(kind: static ConsensusFork): typedesc =
+  when kind == ConsensusFork.Gloas:
+    gloas.NilableBeaconStateRef
+  elif kind == ConsensusFork.Fulu:
+    fulu.NilableBeaconStateRef
+  elif kind == ConsensusFork.Electra:
+    electra.NilableBeaconStateRef
+  elif kind == ConsensusFork.Deneb:
+    deneb.NilableBeaconStateRef
+  elif kind == ConsensusFork.Capella:
+    capella.NilableBeaconStateRef
+  elif kind == ConsensusFork.Bellatrix:
+    bellatrix.NilableBeaconStateRef
+  elif kind == ConsensusFork.Altair:
+    altair.NilableBeaconStateRef
+  elif kind == ConsensusFork.Phase0:
+    phase0.NilableBeaconStateRef
+  else:
+    {.error: "NilableBeaconStateRef unsupported in " & $kind.}
+
+template TrustedBeaconBlock(kind: static ConsensusFork): typedesc =
+  when kind == ConsensusFork.Gloas:
+    gloas.TrustedBeaconBlock
+  elif kind == ConsensusFork.Fulu:
+    fulu.TrustedBeaconBlock
+  elif kind == ConsensusFork.Electra:
+    electra.TrustedBeaconBlock
+  elif kind == ConsensusFork.Deneb:
+    deneb.TrustedBeaconBlock
+  elif kind == ConsensusFork.Capella:
+    capella.TrustedBeaconBlock
+  elif kind == ConsensusFork.Bellatrix:
+    bellatrix.TrustedBeaconBlock
+  elif kind == ConsensusFork.Altair:
+    altair.TrustedBeaconBlock
+  elif kind == ConsensusFork.Phase0:
+    phase0.TrustedBeaconBlock
+  else:
+    {.error: "TrustedBeaconBlock unsupported in " & $kind.}
+
+proc getStateRef(
+    db: BeaconChainDB,
+    consensusFork: static ConsensusFork,
+    root: Eth2Digest): auto =
+  # load beaconstate the way the block pool does it - into an existing instance
+  var res: consensusFork.NilableBeaconStateRef =
+    (consensusFork.BeaconStateRef)()
+  if not db.getState(root, res[], noRollback):
+    res = nil
+  res
+
+<<<<<<< HEAD
 proc getAltairStateRef(db: BeaconChainDB, root: Eth2Digest):
     altair.NilableBeaconStateRef =
   # load beaconstate the way the block pool does it - into an existing instance
@@ -85,10 +151,14 @@ proc getFuluStateRef(db: BeaconChainDB, root: Eth2Digest):
 func withDigest(blck: phase0.TrustedBeaconBlock):
     phase0.TrustedSignedBeaconBlock =
   phase0.TrustedSignedBeaconBlock(
+=======
+func withDigest(blck: ForkyTrustedBeaconBlock): auto =
+  typeof(blck).kind.TrustedSignedBeaconBlock(
+>>>>>>> origin/unstable
     message: blck,
-    root: hash_tree_root(blck)
-  )
+    root: hash_tree_root(blck))
 
+<<<<<<< HEAD
 func withDigest(blck: altair.TrustedBeaconBlock):
     altair.TrustedSignedBeaconBlock =
   altair.TrustedSignedBeaconBlock(
@@ -132,10 +202,15 @@ func withDigest(blck: fulu.TrustedBeaconBlock):
   )
 
 proc getTestStates(consensusFork: ConsensusFork): auto =
+=======
+proc getTestStates(
+    cfg: RuntimeConfig,
+    consensusFork: ConsensusFork): seq[ref ForkedHashedBeaconState] =
+>>>>>>> origin/unstable
   let
-    db = makeTestDB(SLOTS_PER_EPOCH)
-    validatorMonitor = newClone(ValidatorMonitor.init())
-    dag = init(ChainDAGRef, defaultRuntimeConfig, db, validatorMonitor, {})
+    db = cfg.makeTestDB(SLOTS_PER_EPOCH)
+    validatorMonitor = newClone(ValidatorMonitor.init(cfg.time))
+    dag = init(ChainDAGRef, cfg, db, validatorMonitor, {})
   var testStates = getTestStates(dag.headState, consensusFork)
 
   # Ensure transitions beyond just adding validators and increasing slots
@@ -146,6 +221,7 @@ proc getTestStates(consensusFork: ConsensusFork): auto =
 
 # Each set of states gets used twice, so scope them to module
 let
+<<<<<<< HEAD
   testStatesPhase0    = getTestStates(ConsensusFork.Phase0)
   testStatesAltair    = getTestStates(ConsensusFork.Altair)
   testStatesBellatrix = getTestStates(ConsensusFork.Bellatrix)
@@ -161,40 +237,50 @@ doAssert len(testStatesCapella) > 8
 doAssert len(testStatesDeneb) > 8
 doAssert len(testStatesElectra) > 8
 doAssert len(testStatesFulu) > 8
+=======
+  cfg = defaultRuntimeConfig
+  testStates = block:
+    var res: array[ConsensusFork, seq[ref ForkedHashedBeaconState]]
+    for consensusFork in ConsensusFork:
+      res[consensusFork] = cfg.getTestStates(consensusFork)
+    res
+doAssert testStates.allIt(it.len > 8)
+>>>>>>> origin/unstable
 
 suite "Beacon chain DB" & preset():
   test "empty database" & preset():
-    var
-      db = BeaconChainDB.new("", inMemory = true)
+    var db = BeaconChainDB.new("", cfg, inMemory = true)
     check:
-      db.getPhase0StateRef(ZERO_HASH).isNil
+      db.getStateRef(ConsensusFork.Phase0, ZERO_HASH).isNil
       db.getBlock(ZERO_HASH, phase0.TrustedSignedBeaconBlock).isNone
 
-  test "sanity check phase 0 blocks" & preset():
-    let db = BeaconChainDB.new("", inMemory = true)
+  template doBlockTest(consensusFork: static ConsensusFork): untyped =
+    block:
+      let db = BeaconChainDB.new(
+        "", consensusFork.genesisTestRuntimeConfig, inMemory = true)
 
-    let
-      signedBlock = withDigest((phase0.TrustedBeaconBlock)())
-      root = hash_tree_root(signedBlock.message)
+      let
+        signedBlock = withDigest((consensusFork.TrustedBeaconBlock)())
+        root = hash_tree_root(signedBlock.message)
 
-    db.putBlock(signedBlock)
+      db.putBlock(signedBlock)
 
-    var tmp, tmp2: seq[byte]
-    check:
-      db.containsBlock(root)
-      db.containsBlock(root, phase0.TrustedSignedBeaconBlock)
-      not db.containsBlock(root, altair.TrustedSignedBeaconBlock)
-      not db.containsBlock(root, bellatrix.TrustedSignedBeaconBlock)
-      not db.containsBlock(root, capella.TrustedSignedBeaconBlock)
-      not db.containsBlock(root, deneb.TrustedSignedBeaconBlock)
-      not db.containsBlock(root, electra.TrustedSignedBeaconBlock)
-      db.getBlock(root, phase0.TrustedSignedBeaconBlock).get() == signedBlock
-      db.getBlockSSZ(root, tmp, phase0.TrustedSignedBeaconBlock)
-      db.getBlockSZ(root, tmp2, phase0.TrustedSignedBeaconBlock)
-      tmp == SSZ.encode(signedBlock)
-      tmp2 == encodeFramed(tmp)
-      uncompressedLenFramed(tmp2).isSome
+      var tmp, tmp2: seq[byte]
+      check db.containsBlock(root)
+      const fork = consensusFork
+      withAll(ConsensusFork):
+        let ok = db.containsBlock(root, consensusFork.TrustedSignedBeaconBlock)
+        check ok == (consensusFork == fork)
+      check:
+        db.getBlock(
+          root, consensusFork.TrustedSignedBeaconBlock).get() == signedBlock
+        db.getBlockSSZ(root, tmp, consensusFork.TrustedSignedBeaconBlock)
+        db.getBlockSZ(root, tmp2, consensusFork.TrustedSignedBeaconBlock)
+        tmp == SSZ.encode(signedBlock)
+        tmp2 == encodeFramed(tmp)
+        uncompressedLenFramed(tmp2).isSome
 
+<<<<<<< HEAD
     check:
       db.delBlock(ConsensusFork.Phase0, root)
       not db.containsBlock(root)
@@ -833,114 +919,130 @@ suite "Beacon chain DB" & preset():
     check:
       state[].altairData.data.slot == 10.Slot
       not db.getState(root, state[].altairData.data, restore)
+=======
+        db.delBlock(consensusFork, root)
+        not db.containsBlock(root)
+      withAll(ConsensusFork):
+        check not db.containsBlock(root, consensusFork.TrustedSignedBeaconBlock)
+      check:
+        db.getBlock(root, consensusFork.TrustedSignedBeaconBlock).isErr()
+        not db.getBlockSSZ(root, tmp, consensusFork.TrustedSignedBeaconBlock)
+        not db.getBlockSZ(root, tmp2, consensusFork.TrustedSignedBeaconBlock)
+
+      db.putStateRoot(root, signedBlock.message.slot, root)
+      var root2 = root
+      root2.data[0] = root.data[0] + 1
+      db.putStateRoot(root, signedBlock.message.slot + 1, root2)
+
+      check:
+        db.getStateRoot(root, signedBlock.message.slot).get() == root
+        db.getStateRoot(root, signedBlock.message.slot + 1).get() == root2
+
+      db.close()
+
+  withAll(ConsensusFork):
+    let name = "sanity check " & $consensusFork & " blocks"
+    test name & preset():
+      when consensusFork >= ConsensusFork.Gloas:
+        skip()
+      else:
+        consensusFork.doBlockTest()
+
+  template doStateTest(consensusFork: static ConsensusFork): untyped =
+    block:
+      let db = cfg.makeTestDB(SLOTS_PER_EPOCH)
+
+      for state in testStates[consensusFork]:
+        let root = state[].forky(consensusFork).root
+        db.putState(root, state[].forky(consensusFork).data)
+
+        check:
+          db.containsState(root)
+          hash_tree_root(db.getStateRef(consensusFork, root)[]) == root
+
+        db.delState(consensusFork, root)
+        check:
+          not db.containsState(root)
+          db.getStateRef(consensusFork, root).isNil
+
+      db.close()
+
+  withAll(ConsensusFork):
+    let name = "sanity check " & $consensusFork & " states"
+    test name & preset():
+      when consensusFork >= ConsensusFork.Gloas:
+        skip()
+      else:
+        consensusFork.doStateTest()
+
+  template doStateTestReusingBuffers(
+      consensusFork: static ConsensusFork): untyped =
+    block:
+      let
+        db = cfg.makeTestDB(SLOTS_PER_EPOCH)
+        stateBuffer = (consensusFork.BeaconStateRef)()
+
+      for state in testStates[consensusFork]:
+        let root = state[].forky(consensusFork).root
+        db.putState(root, state[].forky(consensusFork).data)
+
+        check:
+          db.getState(root, stateBuffer[], noRollback)
+          db.containsState(root)
+          hash_tree_root(stateBuffer[]) == root
+
+        db.delState(consensusFork, root)
+        check:
+          not db.containsState(root)
+          not db.getState(root, stateBuffer[], noRollback)
+
+      db.close()
+
+  withAll(ConsensusFork):
+    let name = "sanity check " & $consensusFork & " states, reusing buffers"
+    test name & preset():
+      when consensusFork >= ConsensusFork.Gloas:
+        skip()
+      else:
+        consensusFork.doStateTestReusingBuffers()
+
+  template doRollbackTest(consensusFork: static ConsensusFork): untyped =
+    block:
+      var
+        db = cfg.makeTestDB(SLOTS_PER_EPOCH)
+        validatorMonitor = newClone(ValidatorMonitor.init(cfg.time))
+        dag = init(ChainDAGRef, cfg, db, validatorMonitor, {})
+        state = ForkedHashedBeaconState.new(
+          (ref consensusFork.BeaconState)(slot: 10.Slot)[])
+        root = Eth2Digest()
+
+      db.putCorruptState(consensusFork, root)
+
+      let restoreAddr = addr dag.headState
+
+      func restore() =
+        assign(state[], restoreAddr[])
+
+      withState(state[]):
+        check:
+          forkyState.data.slot == 10.Slot
+          not db.getState(root, forkyState.data, restore)
+>>>>>>> origin/unstable
 
       # assign() has switched the case object fork
-      state[].kind == ConsensusFork.Phase0
-      state[].phase0Data.data.slot != 10.Slot
+      check:
+        state[].kind == ConsensusFork.Phase0
+        state[].phase0Data.data.slot != 10.Slot
 
-  test "sanity check Bellatrix and cross-fork getState rollback" & preset():
-    var
-      db = makeTestDB(SLOTS_PER_EPOCH)
-      validatorMonitor = newClone(ValidatorMonitor.init())
-      dag = init(ChainDAGRef, defaultRuntimeConfig, db, validatorMonitor, {})
-      state = (ref ForkedHashedBeaconState)(
-        kind: ConsensusFork.Bellatrix,
-        bellatrixData: bellatrix.HashedBeaconState(data: bellatrix.BeaconState(
-          slot: 10.Slot)))
-      root = Eth2Digest()
-
-    db.putCorruptState(ConsensusFork.Bellatrix, root)
-
-    let restoreAddr = addr dag.headState
-
-    func restore() =
-      assign(state[], restoreAddr[])
-
-    check:
-      state[].bellatrixData.data.slot == 10.Slot
-      not db.getState(root, state[].bellatrixData.data, restore)
-
-      # assign() has switched the case object fork
-      state[].kind == ConsensusFork.Phase0
-      state[].phase0Data.data.slot != 10.Slot
-
-  test "sanity check Capella and cross-fork getState rollback" & preset():
-    var
-      db = makeTestDB(SLOTS_PER_EPOCH)
-      validatorMonitor = newClone(ValidatorMonitor.init())
-      dag = init(ChainDAGRef, defaultRuntimeConfig, db, validatorMonitor, {})
-      state = (ref ForkedHashedBeaconState)(
-        kind: ConsensusFork.Capella,
-        capellaData: capella.HashedBeaconState(data: capella.BeaconState(
-          slot: 10.Slot)))
-      root = Eth2Digest()
-
-    db.putCorruptState(ConsensusFork.Capella, root)
-
-    let restoreAddr = addr dag.headState
-
-    func restore() =
-      assign(state[], restoreAddr[])
-
-    check:
-      state[].capellaData.data.slot == 10.Slot
-      not db.getState(root, state[].capellaData.data, restore)
-
-      # assign() has switched the case object fork
-      state[].kind == ConsensusFork.Phase0
-      state[].phase0Data.data.slot != 10.Slot
-
-  test "sanity check Deneb and cross-fork getState rollback" & preset():
-    var
-      db = makeTestDB(SLOTS_PER_EPOCH)
-      validatorMonitor = newClone(ValidatorMonitor.init())
-      dag = init(ChainDAGRef, defaultRuntimeConfig, db, validatorMonitor, {})
-      state = (ref ForkedHashedBeaconState)(
-        kind: ConsensusFork.Deneb,
-        denebData: deneb.HashedBeaconState(data: deneb.BeaconState(
-          slot: 10.Slot)))
-      root = Eth2Digest()
-
-    db.putCorruptState(ConsensusFork.Deneb, root)
-
-    let restoreAddr = addr dag.headState
-
-    func restore() =
-      assign(state[], restoreAddr[])
-
-    check:
-      state[].denebData.data.slot == 10.Slot
-      not db.getState(root, state[].denebData.data, restore)
-
-      # assign() has switched the case object fork
-      state[].kind == ConsensusFork.Phase0
-      state[].phase0Data.data.slot != 10.Slot
-
-  test "sanity check Electra and cross-fork getState rollback" & preset():
-    var
-      db = makeTestDB(SLOTS_PER_EPOCH)
-      validatorMonitor = newClone(ValidatorMonitor.init())
-      dag = init(ChainDAGRef, defaultRuntimeConfig, db, validatorMonitor, {})
-      state = (ref ForkedHashedBeaconState)(
-        kind: ConsensusFork.Electra,
-        electraData: electra.HashedBeaconState(data: electra.BeaconState(
-          slot: 10.Slot)))
-      root = Eth2Digest()
-
-    db.putCorruptState(ConsensusFork.Electra, root)
-
-    let restoreAddr = addr dag.headState
-
-    func restore() =
-      assign(state[], restoreAddr[])
-
-    check:
-      state[].electraData.data.slot == 10.Slot
-      not db.getState(root, state[].electraData.data, restore)
-
-      # assign() has switched the case object fork
-      state[].kind == ConsensusFork.Phase0
-      state[].phase0Data.data.slot != 10.Slot
+  withAll(ConsensusFork):
+    let name = "sanity check " & $consensusFork &
+      (if consensusFork > ConsensusFork.Phase0: " and cross-fork" else: "") &
+      " getState rollback"
+    test name & preset():
+      when consensusFork >= ConsensusFork.Gloas:
+        skip()
+      else:
+        consensusFork.doRollbackTest()
 
   test "sanity check Fulu and cross-fork getState rollback" & preset():
     var
@@ -969,7 +1071,7 @@ suite "Beacon chain DB" & preset():
       state[].phase0Data.data.slot != 10.Slot
 
   test "find ancestors" & preset():
-    var db = BeaconChainDB.new("", inMemory = true)
+    var db = BeaconChainDB.new("", cfg, inMemory = true)
 
     let
       a0 = withDigest(
@@ -1004,17 +1106,17 @@ suite "Beacon chain DB" & preset():
     # state. We've been bit by this because we've had a bug in the BLS
     # serialization where an all-zero default-initialized bls signature could
     # not be deserialized because the deserialization was too strict.
-    var db = BeaconChainDB.new("", inMemory = true)
+    var db = BeaconChainDB.new("", cfg, inMemory = true)
 
     let
       state = newClone(initialize_hashed_beacon_state_from_eth1(
-        defaultRuntimeConfig, mockEth1BlockHash, 0,
+        cfg, mockEth1BlockHash, 0,
         makeInitialDeposits(SLOTS_PER_EPOCH), {skipBlsValidation}))
 
     db.putState(state[].root, state[].data)
 
     check db.containsState(state[].root)
-    let state2 = db.getPhase0StateRef(state[].root)
+    let state2 = db.getStateRef(ConsensusFork.Phase0, state[].root)
     db.delState(ConsensusFork.Phase0, state[].root)
     check not db.containsState(state[].root)
     db.close()
@@ -1023,7 +1125,7 @@ suite "Beacon chain DB" & preset():
       hash_tree_root(state2[]) == state[].root
 
   test "sanity check state diff roundtrip" & preset():
-    var db = BeaconChainDB.new("", inMemory = true)
+    var db = BeaconChainDB.new("", cfg, inMemory = true)
 
     # TODO htr(diff) probably not interesting/useful, but stand-in
     let
@@ -1057,7 +1159,7 @@ suite "Beacon chain DB" & preset():
       blobSidecar1 = BlobSidecar(signed_block_header: blockHeader0, index: 2)
       blobSidecar2 = BlobSidecar(signed_block_header: blockHeader1, index: 2)
 
-      db = makeTestDB(SLOTS_PER_EPOCH)
+      db = cfg.makeTestDB(SLOTS_PER_EPOCH)
 
     var
       buf: seq[byte]
@@ -1151,6 +1253,7 @@ suite "Beacon chain DB" & preset():
       blockRoot0 = hash_tree_root(blockHeader0.message)
       blockRoot1 = hash_tree_root(blockHeader1.message)
 
+<<<<<<< HEAD
       # Ensure minimal-difference pairs on both block root and 
       # data column index to verify that the columnkey uses both
       dataColumnSidecar0 = DataColumnSidecar(signed_block_header: blockHeader0, index: 3)
@@ -1162,6 +1265,19 @@ suite "Beacon chain DB" & preset():
     var
       buf: seq[byte]
       dataColumnSidecar: DataColumnSidecar
+=======
+      # Ensure minimal-difference pairs on both block root and
+      # data column index to verify that the columnkey uses both
+      dataColumnSidecar0 = fulu.DataColumnSidecar(signed_block_header: blockHeader0, index: 3)
+      dataColumnSidecar1 = fulu.DataColumnSidecar(signed_block_header: blockHeader0, index: 2)
+      dataColumnSidecar2 = fulu.DataColumnSidecar(signed_block_header: blockHeader1, index: 2)
+
+      db = cfg.makeTestDB(SLOTS_PER_EPOCH)
+
+    var
+      buf: seq[byte]
+      dataColumnSidecar: fulu.DataColumnSidecar
+>>>>>>> origin/unstable
 
     check:
       not db.getDataColumnSidecar(blockRoot0, 3, dataColumnSidecar)
@@ -1172,7 +1288,11 @@ suite "Beacon chain DB" & preset():
       not db.getDataColumnSidecarSZ(blockRoot1, 2, buf)
 
     db.putDataColumnSidecar(dataColumnSidecar0)
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/unstable
     check:
       db.getDataColumnSidecar(blockRoot0, 3, dataColumnSidecar)
       dataColumnSidecar == dataColumnSidecar0
@@ -1240,6 +1360,224 @@ suite "Beacon chain DB" & preset():
 
     db.close()
 
+<<<<<<< HEAD
+=======
+suite "Quarantine" & preset():
+  setup:
+    let
+      db = BeaconChainDB.new("", cfg, inMemory = true)
+      quarantine = db.getQuarantineDB()
+
+  teardown:
+    db.close()
+
+  func genBlockRoot(index: int): Eth2Digest =
+    var res: Eth2Digest
+    let tmp = uint64(index).toBytesLE()
+    copyMem(addr res.data[0], unsafeAddr tmp[0], sizeof(uint64))
+    res
+
+  func genKzgCommitment(index: int): KzgCommitment =
+    var res: KzgCommitment
+    let tmp = uint64(index).toBytesLE()
+    copyMem(addr res.bytes[0], unsafeAddr tmp[0], sizeof(uint64))
+    res
+
+  func genBlobSidecar(
+      index: int,
+      slot: int,
+      kzg_commitment: int,
+      proposer_index: int
+  ): BlobSidecar =
+    BlobSidecar(
+      index: BlobIndex(index),
+      kzg_commitment: genKzgCommitment(kzg_commitment),
+      signed_block_header: SignedBeaconBlockHeader(
+        message: BeaconBlockHeader(
+          slot: Slot(slot),
+          proposer_index: uint64(proposer_index))))
+
+  func genDataColumnSidecar(
+      index: int,
+      slot: int,
+      proposer_index: int
+  ): fulu.DataColumnSidecar =
+    fulu.DataColumnSidecar(
+      index: ColumnIndex(index),
+      signed_block_header: SignedBeaconBlockHeader(
+        message: BeaconBlockHeader(
+          slot: Slot(slot),
+          proposer_index: uint64(proposer_index))))
+
+  proc cmp(
+      a: openArray[ref BlobSidecar|ref fulu.DataColumnSidecar],
+      b: openArray[ref BlobSidecar|ref fulu.DataColumnSidecar]
+  ): bool =
+    if len(a) != len(b):
+      return false
+    for index in 0 ..< len(a):
+      if a[index][] != b[index][]:
+        return false
+    true
+
+  proc generateBlobSidecars(): seq[ref BlobSidecar] =
+    @[
+      newClone(genBlobSidecar(0, 100, 10, 24)),
+      newClone(genBlobSidecar(1, 100, 11, 24)),
+      newClone(genBlobSidecar(2, 100, 12, 24)),
+      newClone(genBlobSidecar(3, 100, 13, 24)),
+      newClone(genBlobSidecar(4, 100, 14, 24)),
+      newClone(genBlobSidecar(5, 100, 15, 24)),
+      newClone(genBlobSidecar(6, 100, 16, 24)),
+      newClone(genBlobSidecar(7, 100, 17, 24)),
+      newClone(genBlobSidecar(8, 100, 18, 24))
+    ]
+
+  proc generateDataColumnSidecars(): seq[ref fulu.DataColumnSidecar] =
+    @[
+      newClone(genDataColumnSidecar(0, 200, 100234)),
+      newClone(genDataColumnSidecar(7, 200, 100234)),
+      newClone(genDataColumnSidecar(14, 200, 100234)),
+      newClone(genDataColumnSidecar(21, 200, 100234)),
+      newClone(genDataColumnSidecar(28, 200, 100234)),
+      newClone(genDataColumnSidecar(35, 200, 100234)),
+      newClone(genDataColumnSidecar(42, 200, 100234)),
+      newClone(genDataColumnSidecar(49, 200, 100234)),
+      newClone(genDataColumnSidecar(56, 200, 100234)),
+      newClone(genDataColumnSidecar(63, 200, 100234)),
+      newClone(genDataColumnSidecar(70, 200, 100234)),
+      newClone(genDataColumnSidecar(77, 200, 100234)),
+      newClone(genDataColumnSidecar(84, 200, 100234)),
+      newClone(genDataColumnSidecar(91, 200, 100234)),
+      newClone(genDataColumnSidecar(98, 200, 100234)),
+      newClone(genDataColumnSidecar(127, 200, 100234)),
+    ]
+
+  proc getSidecars(
+      quarantine: QuarantineDB,
+      T: typedesc[BlobSidecar|fulu.DataColumnSidecar],
+      blockRoot: Eth2Digest
+  ): seq[ref T] =
+    var res: seq[ref T]
+    for item in quarantine.sidecars(T, blockRoot):
+      res.add(newClone(item))
+    res
+
+  proc runDataSidecarTest(
+      quarantine: QuarantineDB,
+      T: typedesc[ForkyDataSidecar]
+  ) =
+    let
+      broots = @[
+        genBlockRoot(100), genBlockRoot(200), genBlockRoot(300)
+      ]
+      sidecars =
+        when T is deneb.BlobSidecar:
+          generateBlobSidecars()
+        else:
+          generateDataColumnSidecars()
+      offsets =
+        when T is deneb.BlobSidecar:
+          @[(0, 8), (0, 3), (0, 5)]
+        else:
+          @[(0, 15), (4, 11), (0, 7)]
+
+    check:
+      len(quarantine.getSidecars(T, broots[0])) == 0
+      len(quarantine.getSidecars(T, broots[1])) == 0
+      len(quarantine.getSidecars(T, broots[2])) == 0
+      quarantine.sidecarsCount(T) == 0
+
+    quarantine.removeDataSidecars(T, broots[0])
+    quarantine.removeDataSidecars(T, broots[1])
+    quarantine.removeDataSidecars(T, broots[2])
+
+    quarantine.putDataSidecars(broots[0],
+      sidecars.toOpenArray(offsets[0][0], offsets[0][1]))
+
+    block:
+      let
+        res1 = quarantine.getSidecars(T, broots[0])
+      check:
+        quarantine.sidecarsCount(T) == len(res1)
+        len(res1) == (offsets[0][1] - offsets[0][0] + 1)
+        cmp(res1, sidecars.toOpenArray(offsets[0][0], offsets[0][1])) == true
+        len(quarantine.getSidecars(T, broots[1])) == 0
+        len(quarantine.getSidecars(T, broots[2])) == 0
+
+    quarantine.putDataSidecars(broots[1],
+      sidecars.toOpenArray(offsets[1][0], offsets[1][1]))
+
+    block:
+      let
+        res1 = quarantine.getSidecars(T, broots[0])
+        res2 = quarantine.getSidecars(T, broots[1])
+      check:
+        quarantine.sidecarsCount(T) == len(res1) + len(res2)
+        len(res1) == (offsets[0][1] - offsets[0][0] + 1)
+        len(res2) == (offsets[1][1] - offsets[1][0] + 1)
+        cmp(res1, sidecars.toOpenArray(offsets[0][0], offsets[0][1])) == true
+        cmp(res2, sidecars.toOpenArray(offsets[1][0], offsets[1][1])) == true
+        len(quarantine.getSidecars(T, broots[2])) == 0
+
+    quarantine.putDataSidecars(broots[2],
+      sidecars.toOpenArray(offsets[2][0], offsets[2][1]))
+
+    block:
+      let
+        res1 = quarantine.getSidecars(T, broots[0])
+        res2 = quarantine.getSidecars(T, broots[1])
+        res3 = quarantine.getSidecars(T, broots[2])
+      check:
+        len(res1) == (offsets[0][1] - offsets[0][0] + 1)
+        len(res2) == (offsets[1][1] - offsets[1][0] + 1)
+        len(res3) == (offsets[2][1] - offsets[2][0] + 1)
+        quarantine.sidecarsCount(T) == len(res1) + len(res2) + len(res3)
+        cmp(res1, sidecars.toOpenArray(offsets[0][0], offsets[0][1])) == true
+        cmp(res2, sidecars.toOpenArray(offsets[1][0], offsets[1][1])) == true
+        cmp(res3, sidecars.toOpenArray(offsets[2][0], offsets[2][1])) == true
+
+    quarantine.removeDataSidecars(T, broots[1])
+
+    block:
+      let
+        res1 = quarantine.getSidecars(T, broots[0])
+        res3 = quarantine.getSidecars(T, broots[2])
+      check:
+        len(res1) == (offsets[0][1] - offsets[0][0] + 1)
+        cmp(res1, sidecars.toOpenArray(offsets[0][0], offsets[0][1])) == true
+        len(quarantine.getSidecars(T, broots[1])) == 0
+        len(res3) == (offsets[2][1] - offsets[2][0] + 1)
+        cmp(res3, sidecars.toOpenArray(offsets[2][0], offsets[2][1])) == true
+        quarantine.sidecarsCount(T) == len(res1) + len(res3)
+
+    quarantine.removeDataSidecars(T, broots[0])
+
+    block:
+      let
+        res3 = quarantine.getSidecars(T, broots[2])
+      check:
+        len(quarantine.getSidecars(T, broots[0])) == 0
+        len(quarantine.getSidecars(T, broots[1])) == 0
+        len(res3) == (offsets[2][1] - offsets[2][0] + 1)
+        cmp(res3, sidecars.toOpenArray(offsets[2][0], offsets[2][1])) == true
+        quarantine.sidecarsCount(T) == len(res3)
+
+    quarantine.removeDataSidecars(T, broots[2])
+
+    check:
+      len(quarantine.getSidecars(T, broots[0])) == 0
+      len(quarantine.getSidecars(T, broots[1])) == 0
+      len(quarantine.getSidecars(T, broots[2])) == 0
+      quarantine.sidecarsCount(T) == 0
+
+  test "put/iterate/remove test [BlobSidecars]":
+    quarantine.runDataSidecarTest(deneb.BlobSidecar)
+
+  test "put/iterate/remove test [DataColumnSidecar]":
+    quarantine.runDataSidecarTest(fulu.DataColumnSidecar)
+
+>>>>>>> origin/unstable
 suite "FinalizedBlocks" & preset():
   test "Basic ops" & preset():
     var

@@ -198,7 +198,11 @@ suite baseDescription & "Execution Payload " & preset():
   func makeApplyExecutionPayloadCb(path: string): auto =
     return proc(
         preState: var fulu.BeaconState, body: fulu.BeaconBlockBody):
+<<<<<<< HEAD
         Result[void, cstring] {.raises: [IOError].} =
+=======
+        Result[void, cstring] =
+>>>>>>> origin/unstable
       let payloadValid = os_ops.readFile(
           OpExecutionPayloadDir/"pyspec_tests"/path/"execution.yaml"
         ).contains("execution_valid: true")
@@ -209,7 +213,11 @@ suite baseDescription & "Execution Payload " & preset():
           body.compute_execution_block_hash(
             preState.latest_block_root(
               assignClone(preState)[].hash_tree_root())))
+<<<<<<< HEAD
       func executePayload(_: fulu.ExecutionPayload): bool = payloadValid
+=======
+      func executePayload(_: deneb.ExecutionPayload): bool = payloadValid
+>>>>>>> origin/unstable
       process_execution_payload(
         defaultRuntimeConfig, preState, body, executePayload)
 
@@ -285,10 +293,18 @@ suite baseDescription & "Voluntary Exit " & preset():
 suite baseDescription & "Withdrawals " & preset():
   func applyWithdrawals(
       preState: var fulu.BeaconState,
+<<<<<<< HEAD
       executionPayload: fulu.ExecutionPayload): Result[void, cstring] =
     process_withdrawals(preState, executionPayload)
 
   for path in walkTests(OpWithdrawalsDir):
     runTest[fulu.ExecutionPayload, typeof applyWithdrawals](
+=======
+      executionPayload: deneb.ExecutionPayload): Result[void, cstring] =
+    process_withdrawals(preState, executionPayload)
+
+  for path in walkTests(OpWithdrawalsDir):
+    runTest[deneb.ExecutionPayload, typeof applyWithdrawals](
+>>>>>>> origin/unstable
       OpWithdrawalsDir, suiteName, "Withdrawals", "execution_payload",
       applyWithdrawals, path)
