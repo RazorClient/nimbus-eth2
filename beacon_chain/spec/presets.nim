@@ -223,9 +223,6 @@ when const_preset == "mainnet":
     # Free-form short name of the network that this configuration applies to - known
     # canonical network names include:
     # * 'mainnet' - there can be only one
-    # * 'sepolia' - testnet
-    # * 'holesky' - testnet
-    # * 'hoodi' - testnet
     # Must match the regex: [a-z0-9\-]
     CONFIG_NAME: "",
 
@@ -401,201 +398,6 @@ when const_preset == "mainnet":
     VALIDATOR_CUSTODY_REQUIREMENT: 8,
     BALANCE_PER_ADDITIONAL_CUSTODY_GROUP: 32000000000'u64,
     MIN_EPOCHS_FOR_DATA_COLUMN_SIDECARS_REQUESTS: 4096,
-  )
-
-elif const_preset == "gnosis":
-  import ./presets/gnosis
-  export gnosis
-
-  # The default run-time config specifies the default configuration values
-  # that will be used if a particular run-time config is missing specific
-  # confugration values (which will be then taken from this config object).
-  # It mostly matches the gnosis config with the exception of few properties
-  # such as `CONFIG_NAME`, `TERMINAL_TOTAL_DIFFICULTY`, `*_FORK_EPOCH`, etc
-  # which must be effectively overriden in all network (including mainnet).
-  const defaultRuntimeConfig* = RuntimeConfig(
-    PRESET_BASE: "gnosis",
-
-    # Free-form short name of the network that this configuration applies to - known
-    # canonical network names include:
-    # * 'gnosis' - there can be only one
-    # * 'chiado' - testnet
-    # Must match the regex: [a-z0-9\-]
-    CONFIG_NAME: "",
-
-    # Transition
-    # ---------------------------------------------------------------
-    # TBD, 2**256-2**10 is a placeholder
-    TERMINAL_TOTAL_DIFFICULTY:
-      u256"115792089237316195423570985008687907853269984665640564039457584007913129638912",
-    # By default, don't use these params
-    TERMINAL_BLOCK_HASH:
-      hash32"0x0000000000000000000000000000000000000000000000000000000000000000",
-
-    # Genesis
-    # ---------------------------------------------------------------
-    # `2**14` (= 16,384)
-    MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: 4096,
-    # Dec 1, 2020, 12pm UTC
-    MIN_GENESIS_TIME: 1638968400,
-    # Mainnet initial fork version, recommend altering for testnets
-    GENESIS_FORK_VERSION: Version [byte 0x00, 0x00, 0x00, 0x64],
-    # 604800 seconds (7 days)
-    GENESIS_DELAY: 604800,
-
-    # Forking
-    # ---------------------------------------------------------------
-    # Some forks are disabled for now:
-    #  - These may be re-assigned to another fork-version later
-    #  - Temporarily set to max uint64 value: 2**64 - 1
-
-    # Altair
-    ALTAIR_FORK_VERSION: Version [byte 0x01, 0x00, 0x00, 0x64],
-    ALTAIR_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Bellatrix
-    BELLATRIX_FORK_VERSION: Version [byte 0x02, 0x00, 0x00, 0x64],
-    BELLATRIX_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Capella
-    CAPELLA_FORK_VERSION: Version [byte 0x03, 0x00, 0x00, 0x64],
-    CAPELLA_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Deneb
-    DENEB_FORK_VERSION: Version [byte 0x04, 0x00, 0x00, 0x64],
-    DENEB_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Electra
-    ELECTRA_FORK_VERSION: Version [byte 0x05, 0x00, 0x00, 0x64],
-    ELECTRA_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Fulu
-    FULU_FORK_VERSION: Version [byte 0x06, 0x00, 0x00, 0x64],
-    FULU_FORK_EPOCH: FAR_FUTURE_EPOCH,
-    # Gloas
-    GLOAS_FORK_VERSION: Version [byte 0x07, 0x00, 0x00, 0x64],
-    GLOAS_FORK_EPOCH: FAR_FUTURE_EPOCH,
-
-    # Time parameters
-    # ---------------------------------------------------------------
-    timeParams: TimeParams(
-      # 5 seconds
-      SLOT_DURATION: milliseconds(5000),
-
-      # 1667 basis points, ~17% of SLOT_DURATION_MS
-      PROPOSER_REORG_CUTOFF_BPS: 1667,
-      # 3333 basis points, ~33% of SLOT_DURATION_MS
-      ATTESTATION_DUE_BPS: 3333,
-      # 6667 basis points, ~67% of SLOT_DURATION_MS
-      AGGREGATE_DUE_BPS: 6667,
-
-      # Altair
-      # 3333 basis points, ~33% of SLOT_DURATION_MS
-      SYNC_MESSAGE_DUE_BPS: 3333,
-      # 6667 basis points, ~67% of SLOT_DURATION_MS
-      CONTRIBUTION_DUE_BPS: 6667,
-
-      # Gloas
-      # 2500 basis points, ~25% of SLOT_DURATION_MS
-      ATTESTATION_DUE_BPS_GLOAS: 2500,
-      # 5000 basis points, ~50% of SLOT_DURATION_MS
-      AGGREGATE_DUE_BPS_GLOAS: 5000,
-      # 2500 basis points, ~25% of SLOT_DURATION_MS
-      SYNC_MESSAGE_DUE_BPS_GLOAS: 2500,
-      # 5000 basis points, ~50% of SLOT_DURATION_MS
-      CONTRIBUTION_DUE_BPS_GLOAS: 5000,
-      # 7500 basis points, ~75% of SLOT_DURATION_MS
-      PAYLOAD_ATTESTATION_DUE_BPS: 7500),
-
-    # 14 (estimate from Eth1 mainnet)
-    SECONDS_PER_ETH1_BLOCK: 5,
-    # 2**8 (= 256) epochs ~27 hours
-    MIN_VALIDATOR_WITHDRAWABILITY_DELAY: 256,
-    # 2**8 (= 256) epochs ~27 hours
-    SHARD_COMMITTEE_PERIOD: 256,
-    # 2**11 (= 2,048) Eth1 blocks ~8 hours
-    ETH1_FOLLOW_DISTANCE: 2048,
-
-
-    # Validator cycle
-    # ---------------------------------------------------------------
-    # 2**2 (= 4)
-    INACTIVITY_SCORE_BIAS: 4,
-    # 2**4 (= 16)
-    INACTIVITY_SCORE_RECOVERY_RATE: 16,
-    # 2**4 * 10**9 (= 16,000,000,000) Gwei
-    EJECTION_BALANCE: 16000000000'u64,
-    # 2**2 (= 4)
-    MIN_PER_EPOCH_CHURN_LIMIT: 4,
-    # 2**16 (= 65,536)
-    CHURN_LIMIT_QUOTIENT: 4096,
-    # [New in Deneb:EIP7514] 2**3 (= 8)
-    MAX_PER_EPOCH_ACTIVATION_CHURN_LIMIT: 8,
-
-    # Fork choice
-    # ---------------------------------------------------------------
-    REORG_HEAD_WEIGHT_THRESHOLD: 20,
-    REORG_MAX_EPOCHS_SINCE_FINALIZATION: 2,
-
-    # Deposit contract
-    # ---------------------------------------------------------------
-    # Gnosis PoW Mainnet
-    DEPOSIT_CHAIN_ID: 100,
-    DEPOSIT_NETWORK_ID: 100,
-    DEPOSIT_CONTRACT_ADDRESS: default(Eth1Address),
-
-    # Networking
-    # ---------------------------------------------------------------
-    # `10 * 2**20` (= 10485760, 10 MiB)
-    # TODO MAX_PAYLOAD_SIZE: 10485760,
-    # `2**10` (= 1024)
-    # TODO MAX_REQUEST_BLOCKS: 1024,
-    # `2**8` (= 256)
-    # TODO EPOCHS_PER_SUBNET_SUBSCRIPTION: 256,
-    # `MIN_VALIDATOR_WITHDRAWABILITY_DELAY + CHURN_LIMIT_QUOTIENT // 2` (= 33024, ~5 months)
-    MIN_EPOCHS_FOR_BLOCK_REQUESTS: 33024,
-    # TODO ATTESTATION_PROPAGATION_SLOT_RANGE: 32,
-    # 500ms
-    # TODO MAXIMUM_GOSSIP_CLOCK_DISPARITY: 500,
-    # TODO MESSAGE_DOMAIN_INVALID_SNAPPY: [byte 0x00, 0x00, 0x00, 0x00],
-    # TODO MESSAGE_DOMAIN_VALID_SNAPPY: [byte 0x01, 0x00, 0x00, 0x00],
-    # 2 subnets per node
-    # TODO SUBNETS_PER_NODE: 2,
-    # 2**8 (= 64)
-    # TODO ATTESTATION_SUBNET_COUNT: 64,
-    # TODO ATTESTATION_SUBNET_EXTRA_BITS: 0,
-    # ceillog2(ATTESTATION_SUBNET_COUNT) + ATTESTATION_SUBNET_EXTRA_BITS
-    # TODO ATTESTATION_SUBNET_PREFIX_BITS: 6,
-
-    # Deneb
-    # `2**7` (=128)
-    # TODO MAX_REQUEST_BLOCKS_DENEB: 128,
-    # `2**12` (= 4096 epochs, ~18 days)
-    MIN_EPOCHS_FOR_BLOB_SIDECARS_REQUESTS: 16384,
-    # `6`
-    BLOB_SIDECAR_SUBNET_COUNT: 6,
-    # `uint64(2)`
-    MAX_BLOBS_PER_BLOCK: 2,
-    # MAX_REQUEST_BLOCKS_DENEB * MAX_BLOBS_PER_BLOCK
-    MAX_REQUEST_BLOB_SIDECARS: 768,
-
-    # Electra
-    # 2**7 * 10**9 (= 128,000,000,000)
-    MIN_PER_EPOCH_CHURN_LIMIT_ELECTRA: 128000000000'u64,
-    # 2**8 * 10**9 (= 256,000,000,000)
-    MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT: 256000000000'u64,
-    # `2`
-    BLOB_SIDECAR_SUBNET_COUNT_ELECTRA: 2,
-    # `uint64(2)`
-    MAX_BLOBS_PER_BLOCK_ELECTRA: 2,
-    # MAX_REQUEST_BLOCKS_DENEB * MAX_BLOBS_PER_BLOCK_ELECTRA
-    MAX_REQUEST_BLOB_SIDECARS_ELECTRA: 256,
-
-    # Fulu
-    NUMBER_OF_COLUMNS: 128,
-    NUMBER_OF_CUSTODY_GROUPS: 128,
-    DATA_COLUMN_SIDECAR_SUBNET_COUNT: 128,
-    MAX_REQUEST_DATA_COLUMN_SIDECARS: 16384,
-    SAMPLES_PER_SLOT: 8,
-    CUSTODY_REQUIREMENT: 4,
-    VALIDATOR_CUSTODY_REQUIREMENT: 8,
-    BALANCE_PER_ADDITIONAL_CUSTODY_GROUP: 32000000000'u64,
-    MIN_EPOCHS_FOR_DATA_COLUMN_SIDECARS_REQUESTS: 4096
   )
 
 elif const_preset == "minimal":
@@ -791,14 +593,12 @@ elif const_preset == "minimal":
     MIN_EPOCHS_FOR_DATA_COLUMN_SIDECARS_REQUESTS: 4096,
   )
 
+
 else:
-  {.error: "Only mainnet, gnosis, and minimal presets supported".}
+  {.error: "Only mainnet and minimal presets supported".}
 
 const IsMainnetSupported*: bool =
   const_preset == "mainnet"
-
-const IsGnosisSupported*: bool =
-  const_preset == "gnosis"
 
 const SLOTS_PER_SYNC_COMMITTEE_PERIOD* =
   SLOTS_PER_EPOCH * EPOCHS_PER_SYNC_COMMITTEE_PERIOD
