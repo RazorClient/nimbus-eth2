@@ -10,11 +10,6 @@
 	url = https://github.com/eth-clients/mainnet.git
 	ignore = untracked
 	branch = main
-[submodule "vendor/nim-eth2-scenarios"]
-	path = vendor/nim-eth2-scenarios
-	url = https://github.com/status-im/nim-eth2-scenarios
-	ignore = untracked
-	branch = master
 [submodule "vendor/nim-blscurve"]
 	path = vendor/nim-blscurve
 	url = https://github.com/status-im/nim-blscurve.git
