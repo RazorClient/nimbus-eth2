@@ -1,5 +1,5 @@
 # beacon_chain
-# Copyright (c) 2018-2025 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed and distributed under either of
 #   * MIT license (license terms in the root directory or at https://opensource.org/licenses/MIT).
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
@@ -199,8 +199,11 @@ proc obsoleteCmdOpt*(ConfType: type object, opt, msg: string) =
     warn "Ignoring deprecated configuration option", opt, msg
 
 template loggerSetup(ConfType: type): untyped =
-  proc (config: ConfType) {.raises: [], gcsafe.} =
-    setupLogging(config.logLevel, config.logStdout, config.logFile)
+  proc (config: var ConfType) {.raises: [], gcsafe.} =
+    when compiles(config.logFile):
+      setupLogging(config.logLevel, config.logFormat, config.logFile)
+    else:
+      setupLogging(config.logLevel, config.logFormat)
 
 proc loadWithBanners*(
     ConfType: type,
@@ -208,7 +211,7 @@ proc loadWithBanners*(
     versions: openArray[string],
     ignoreUnknown = false,
     environment: openArray[string] = [],
-     setupLogger = false
+    setupLogger = false
 ): Result[ConfType, string] =
   let
     version =
@@ -238,7 +241,7 @@ proc loadWithBanners*(
           if config.configFile.isSome:
             sources.addConfigFile(Toml, config.configFile.get)
         ,
-        loggerSetup = if setupLogger: loggerSetup(ConfType) else: nil
+        onLoaded = if setupLogger: loggerSetup(ConfType) else: nil
       )
     except CatchableError as exc:
       # Logging not configured yet!

@@ -1,5 +1,5 @@
 # beacon_chain
-# Copyright (c) 2022-2025 Status Research & Development GmbH
+# Copyright (c) 2022-2026 Status Research & Development GmbH
 # Licensed and distributed under either of
 #   * MIT license (license terms in the root directory or at https://opensource.org/licenses/MIT).
 #   * Apache v2 license (license terms in the root directory or at https://www.apache.org/licenses/LICENSE-2.0).
@@ -60,26 +60,19 @@ proc main() {.noinline, raises: [CatchableError].} =
   template cfg(): auto = metadata.cfg
 
   let
-    genesisBytes = try: waitFor metadata.fetchGenesisBytes()
+    genesisState = try: waitFor metadata.fetchGenesisState()
                    except CatchableError as err:
                      error "Failed to obtain genesis state",
                             source = metadata.genesis.sourceDesc,
                             err = err.msg
                      quit 1
-    genesisState =
-      try:
-        newClone(readSszForkedHashedBeaconState(cfg, genesisBytes))
-      except CatchableError as err:
-        raiseAssert "Invalid baked-in state: " & err.msg
-
-    genesisTime = getStateField(genesisState[], genesis_time)
+    genesisTime = genesisState[].genesis_time
     beaconClock = BeaconClock.init(cfg.timeParams, genesisTime).valueOr:
       error "Invalid genesis time in state", genesisTime
       quit 1
     getBeaconTime = beaconClock.getBeaconTimeFn()
 
-    genesis_validators_root =
-      getStateField(genesisState[], genesis_validators_root)
+    genesis_validators_root = genesisState[].genesis_validators_root
     forkDigests = newClone ForkDigests.init(cfg, genesis_validators_root)
 
     genesisBlockRoot = get_initial_beacon_block(genesisState[]).root
@@ -118,7 +111,7 @@ proc main() {.noinline, raises: [CatchableError].} =
 
   # Run `exchangeTransitionConfiguration` loop
   if elManager != nil:
-    elManager.start(syncChain = false)
+    elManager.start()
 
   info "Listening to incoming network requests"
   network.registerProtocol(
@@ -194,11 +187,15 @@ proc main() {.noinline, raises: [CatchableError].} =
             when lcDataForkAtConsensusFork(consensusFork) == lcDataFork:
               debug "Sending forkchoiceUpdated",
                 finalizedBlockHash = finalizedBlockHash
+
+              let state = ForkchoiceStateV1.init(
+                blockHash,
+                finalizedBlockHash, # justified not available
+                finalizedBlockHash
+              )
               optimisticFcuFut = elManager.forkchoiceUpdated(
-                headBlockHash = blockHash,
-                safeBlockHash = finalizedBlockHash,  # justified not available
-                finalizedBlockHash = finalizedBlockHash,
-                payloadAttributes = Opt.none(consensusFork.PayloadAttributes))
+                state, payloadAttributes = Opt.none(consensusFork.PayloadAttributes)
+              )
               optimisticFcuFut.addCallback do (future: pointer):
                 optimisticFcuFut = nil
         else:
