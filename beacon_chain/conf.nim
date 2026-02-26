@@ -190,7 +190,7 @@ type
       name: "era-dir" .}: Option[InputDir]
 
     web3ForcePolling* {.
-      hidden
+      obsolete
       name: "web3-force-polling" .}: Option[bool]
 
     web3Urls* {.
@@ -207,12 +207,12 @@ type
       name: "no-el" .}: bool
 
     optimistic* {.
-      hidden # deprecated > 22.12
+      obsolete # deprecated > 22.12
       desc: "Run the node in optimistic mode, allowing it to optimistically sync without an execution client (flag deprecated, always on)"
       name: "optimistic".}: Option[bool]
 
     requireEngineAPI* {.
-      hidden  # Deprecated > 22.9
+      obsolete  # Deprecated > 22.9
       desc: "Require Nimbus to be configured with an Engine API end-point after the Bellatrix fork epoch"
       name: "require-engine-api-in-bellatrix" .}: Option[bool]
 
@@ -371,11 +371,11 @@ type
         name: "genesis-state-url" .}: Option[Uri]
 
       finalizedDepositTreeSnapshot* {.
-        hidden
+        obsolete
         name: "finalized-deposit-tree-snapshot" .}: Option[InputFile]
 
       finalizedCheckpointBlock* {.
-        hidden
+        obsolete
         desc: "SSZ file specifying a recent finalized block"
         name: "finalized-checkpoint-block" .}: Option[InputFile]
 
@@ -563,7 +563,7 @@ type
         name: "debug-long-range-sync".}: LongRangeSyncMode
 
       inProcessValidators* {.
-        hidden
+        obsolete
         desc: "Deprecated for removal"
         name: "in-process-validators" .}: Option[bool]
 
@@ -620,7 +620,7 @@ type
         name: "sync-horizon" .}: Option[uint64]
 
       terminalTotalDifficultyOverride* {.
-        hidden
+        obsolete
         desc: "Deprecated for removal"
         name: "terminal-total-difficulty-override" .}: Option[string]
 
@@ -645,7 +645,7 @@ type
 
       safeSlotsToImportOptimistically* {.
         # Never unhidden or documented, and deprecated > 22.9.1
-        hidden
+        obsolete
         desc: "Deprecated for removal"
         name: "safe-slots-to-import-optimistically" .}: Option[uint16]
 
