@@ -134,16 +134,11 @@ type
       defaultValue: "INFO"
       name: "log-level" .}: string
 
-    logStdout* {.
-      hidden
+    logFormat*  {.
       desc: "Specifies what kind of logs should be written to stdout (auto, colors, nocolors, json)"
       defaultValueDesc: "auto"
       defaultValue: StdoutLogKind.Auto
       name: "log-format" .}: StdoutLogKind
-
-    logFile* {.
-      desc: "Specifies a path for the written JSON log file (deprecated)"
-      name: "log-file" .}: Option[OutFile]
 
     eth2Network* {.
       desc: "The Eth2 network to join"
@@ -271,6 +266,10 @@ type
     jwtSecret* {.
       desc: "A file containing the hex-encoded 256 bit secret key to be used for verifying/generating JWT tokens"
       name: "jwt-secret" .}: Option[InputFile]
+
+    logFile* {.
+        obsolete: "Logging to file has been deprecated since v1.5.3, see https://nimbus.guide/logging.html#logging-to-a-file"
+        name: "log-file" .}: Option[OutFile]
 
     case cmd* {.
       command
@@ -901,16 +900,11 @@ type
       defaultValue: "INFO"
       name: "log-level" .}: string
 
-    logStdout* {.
-      hidden
-      desc: "Specifies what kind of logs should be written to stdout (auto, colors, nocolors, json)"
+    logFormat* {.
+      desc: "Choice of log format (auto, colors, nocolors, json)"
       defaultValueDesc: "auto"
       defaultValue: StdoutLogKind.Auto
       name: "log-format" .}: StdoutLogKind
-
-    logFile* {.
-      desc: "Specifies a path for the written JSON log file (deprecated)"
-      name: "log-file" .}: Option[OutFile]
 
     dataDirFlag* {.
       desc: "The directory where nimbus will store all blockchain data"
@@ -1067,6 +1061,10 @@ type
       defaultValue: BlockMonitoringType.Event
       name: "block-monitor-type".}: BlockMonitoringType
 
+    logFile* {.
+      obsolete: "Logging to file has been deprecated since v1.5.3, see https://nimbus.guide/logging.html#logging-to-a-file"
+      name: "log-file" .}: Option[OutFile]
+
   SigningNodeConf* = object
     configFile* {.
       desc: "Loads the configuration from a TOML file"
@@ -1077,13 +1075,14 @@ type
       defaultValue: "INFO"
       name: "log-level" .}: string
 
-    logStdout* {.
-      desc: "Specifies what kind of logs should be written to stdout (auto, colors, nocolors, json)"
+    logFormat* {.
+      desc: "Choice of log format (auto, colors, nocolors, json)"
       defaultValueDesc: "auto"
       defaultValue: StdoutLogKind.Auto
       name: "log-stdout" .}: StdoutLogKind
 
     logFile* {.
+      hidden
       desc: "Specifies a path for the written JSON log file"
       name: "log-file" .}: Option[OutFile]
 

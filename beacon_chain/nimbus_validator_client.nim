@@ -542,11 +542,12 @@ proc runForkScheduleWaitingLoop(
     await vc.forksAvailable.wait()
     let
       slot = vc.beaconClock.now().slotOrZero(vc.timeParams)
-      config = vc.getConsensusForkConfig(vc.forkAtEpoch(slot.epoch())).get()
+      fork = vc.forkAtEpoch(slot.epoch())
+      consensusFork = vc.getConsensusFork(fork)
     notice "Current fork schedule information",
-      fork = config.key.toString(),
-      version = toHex(distinctBase config.value.version),
-      epoch = config.value.epoch
+      fork = consensusFork.toString(),
+      version = toHex(distinctBase fork.current_version),
+      epoch = fork.epoch
   except CancelledError as exc:
     debug "Fork schedule waiting loop was interrupted"
     raise exc
